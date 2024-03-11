@@ -3,7 +3,7 @@
 \docType{data}
 \name{RawData_Exp7}
 \alias{RawData_Exp7}
-\title{Raw Data of the second Saccade Experiment}
+\title{Raw Data of the seventh Saccade Experiment}
 \format{
 \subsection{\code{RawData_Exp7}}{
 
@@ -21,6 +21,7 @@ A data frame with 35280 rows and 13 columns:
 "same" = same location for cue and stimulus, "close" = the cue was one spatial position away from the stimulus,
 "opposite" = the cue was presented opposite of the stimulus}
 \item{FixDur}{The fixation duration preceeding each trial in milliseconds.}
+\item{SOA}{The stimulus onset asynchrony between cue and target onset in milliseconds.}
 \item{CTI}{The cue target intercal coded in milliseconds.}
 \item{stim}{The letter stimulus that was presented to be identified.}
 \item{response}{The response given by the subject as the letter on the keyboard.}
@@ -36,6 +37,6 @@ A data frame with 35280 rows and 13 columns:
 RawData_Exp7
 }
 \description{
-Raw Data of the second Saccade Experiment
+Raw Data of the seventh Saccade Experiment
 }
 \keyword{datasets}

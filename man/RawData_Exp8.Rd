@@ -3,7 +3,7 @@
 \docType{data}
 \name{RawData_Exp8}
 \alias{RawData_Exp8}
-\title{Raw Data of the second Saccade Experiment}
+\title{Raw Data of the eight Saccade Experiment}
 \format{
 \subsection{\code{RawData_Exp8}}{
 
@@ -13,6 +13,7 @@ A data frame with 35280 rows and 13 columns:
 \item{ID}{Unique integer code for each subject who participated in the experiment}
 \item{Block}{The experimental block a trial was part of.}
 \item{trial}{The trial number of the current trial}
+\item{device}{The device that was used for testing}
 \item{cueLoc}{The cue location coded as a numeric value from 1 to 4.
 1 = "top", 2 = "right", 3 = "bottom", 4 = "left"}
 \item{stimLoc}{The stimulus location coded as a numeric value from 1 to 4.
@@ -21,6 +22,7 @@ A data frame with 35280 rows and 13 columns:
 "same" = same location for cue and stimulus, "close" = the cue was one spatial position away from the stimulus,
 "opposite" = the cue was presented opposite of the stimulus}
 \item{FixDur}{The fixation duration preceeding each trial in milliseconds.}
+\item{SOA}{The stimulus onset asynchrony between cue and target onset in milliseconds.}
 \item{CTI}{The cue target intercal coded in milliseconds.}
 \item{stim}{The letter stimulus that was presented to be identified.}
 \item{response}{The response given by the subject as the letter on the keyboard.}
@@ -36,6 +38,6 @@ A data frame with 35280 rows and 13 columns:
 RawData_Exp8
 }
 \description{
-Raw Data of the second Saccade Experiment
+Raw Data of the eight Saccade Experiment
 }
 \keyword{datasets}

@@ -3,13 +3,14 @@
 \docType{data}
 \name{RawData_Exp9}
 \alias{RawData_Exp9}
-\title{Raw Data of the second Saccade Experiment}
+\title{Raw Data of the ninth Saccade Experiment (Individual Diff. Study 2)}
 \format{
 \subsection{\code{RawData_Exp9}}{
 
 A data frame with 35280 rows and 13 columns:
 \describe{
 \item{Exp}{Label for the Experiment in the whole experiment series}
+\item{task}{The task within Experiment 9 from which the data stem from}
 \item{ID}{Unique integer code for each subject who participated in the experiment}
 \item{Block}{The experimental block a trial was part of.}
 \item{trial}{The trial number of the current trial}
@@ -36,6 +37,6 @@ A data frame with 35280 rows and 13 columns:
 RawData_Exp9
 }
 \description{
-Raw Data of the second Saccade Experiment
+Raw Data of the ninth Saccade Experiment (Individual Diff. Study 2)
 }
 \keyword{datasets}
