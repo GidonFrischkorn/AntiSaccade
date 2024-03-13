@@ -1,14 +1,40 @@
 Package: AntiSaccade
-Title: What the Package Does (One Line, Title Case)
+Title: AntiSaccade: Online Supplement
 Version: 0.0.0.9000
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
+    person("Gidon", "Frischkorn", , "gidon.frischkorn@psychologie.uzh.ch", role = c("aut", "cre"),
            comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: What the package does (one paragraph).
+Description: Collection of data, function, and markdown files to document analyses for a nine 
+  experiment series exploring the processes involved in the manual Anti-Saccade task.
 License: GPL (>= 3)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.1
+Suggests: 
+    testthat (>= 3.0.0),
+    usethis,
+    knitr,
+    rmarkdown,
+    bookdown,
+    ggplot2,
+    mixtur,
+    ggthemes,
+    cowplot,
+    stringr,
+    remotes, 
+    waldo,
+    fansi,
+    cmdstanr (>= 0.7.0)
+Imports: 
+    magrittr,
+    parallel,
+    dplyr,
+    tidyr,
+    stats,
+    tidybayes,
+    bayestestR,
+    brms
 Depends: 
-    R (>= 2.10)
+    R (>= 2.10),
 LazyData: true
+VignetteBuilder: knitr

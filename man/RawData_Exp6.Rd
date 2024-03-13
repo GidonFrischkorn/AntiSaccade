@@ -7,7 +7,7 @@
 \format{
 \subsection{\code{RawData_Exp6}}{
 
-A data frame with 35280 rows and 13 columns:
+A data frame with 16200 rows and 13 columns:
 \describe{
 \item{Exp}{Label for the Experiment in the whole experiment series}
 \item{ID}{Unique integer code for each subject who participated in the experiment}
@@ -29,9 +29,6 @@ A data frame with 35280 rows and 13 columns:
 \item{RTms}{Reaction Time of the response in milliseconds}
 }
 }
-}
-\source{
-\url{https://www.who.int/teams/global-tuberculosis-programme/data}
 }
 \usage{
 RawData_Exp6

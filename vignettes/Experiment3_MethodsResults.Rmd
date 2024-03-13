@@ -1,0 +1,19 @@
+---
+title: "Experiment3_MethodsResults"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Experiment3_MethodsResults}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(AntiSaccade)
+```
