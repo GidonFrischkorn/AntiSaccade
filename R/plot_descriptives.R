@@ -11,13 +11,13 @@
 #'
 #' @export
 plot_descriptives <- function(data, formula, family ,idVar, file = NULL, clean = TRUE, ...) {
-  if ("brmsformula" %in% class(bf_binomial)) {
-    vars <- all.vars(bf_binomial$formula)
-  } else if ("formula" %in% class(bf_binomial)) {
-    vars <- all.vars(bf_binomial)
+  if ("brmsformula" %in% class(formula)) {
+    vars <- all.vars(formula$formula)
+  } else if ("formula" %in% class(formula)) {
+    vars <- all.vars(formula)
   }
 
-  resp_var <- syms(vars[1:2])
+  resp_var <- dplyr::syms(vars[1:2])
   vars <- vars[-(1:2)]
 
   vars <- vars[-which(idVar == vars)]
@@ -28,11 +28,13 @@ plot_descriptives <- function(data, formula, family ,idVar, file = NULL, clean =
   }
 
   plot <- ggplot2::ggplot(data = agg_data,
-                  aes(x = !! data_vars[[1]], y = !!resp_var[[1]]/ !!resp_var[[2]],
-                      color = !! color_var, fill = !! color_var, shape_var = !! color_var)) +
-    stat_summary(position = position_dodge(0.25)) +
-    geom_jitter(position = position_jitterdodge(jitter.width = 0.2, dodge.width = .25),
-                alpha = 0.5)
+                  ggplot2::aes(x = !! data_vars[[1]], y = !!resp_var[[1]] / !!resp_var[[2]],
+                      color = !! color_var, fill = !! color_var, shape_var = !! color_var,
+                      group = !! color_var)) +
+    ggplot2::stat_summary(position = ggplot2::position_dodge(0.5)) +
+    ggplot2::stat_summary(geom = "line", fun = "mean", position = ggplot2::position_dodge(0.5)) +
+    ggplot2::geom_jitter(position = ggplot2::position_jitterdodge(jitter.width = 0.3, dodge.width = .5),
+                alpha = 0.3)
 
   if (clean) {
     plot <- clean_plot(plot)
@@ -48,14 +50,14 @@ plot_descriptives <- function(data, formula, family ,idVar, file = NULL, clean =
 #' @export
 clean_plot <- function(plot, ...) {
   plot <- plot +
-    theme(panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          panel.background = element_blank(),
-          axis.line.x = element_line(color = 'black'),
-          axis.line.y = element_line(color = 'black'),
-          legend.key = element_rect(fill = 'white'),
-          text = element_text(size = 18),
-          line = element_line(linewidth = 1),
-          axis.ticks = element_line(linewidth = 1),
+    ggplot2::theme(panel.grid.major = ggplot2::element_blank(),
+          panel.grid.minor = ggplot2::element_blank(),
+          panel.background = ggplot2::element_blank(),
+          axis.line.x = ggplot2::element_line(color = 'black'),
+          axis.line.y = ggplot2::element_line(color = 'black'),
+          legend.key = ggplot2::element_rect(fill = 'white'),
+          text = ggplot2::element_text(size = 18),
+          line = ggplot2::element_line(linewidth = 1),
+          axis.ticks = ggplot2::element_line(linewidth = 1),
           ...)
 }

@@ -6,14 +6,112 @@ vignette: >
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
-
+  
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>"
+collapse = TRUE,
+comment = "#>"
 )
+
+options(mc.cores = parallel::detectCores())
 ```
 
-```{r setup}
-library(AntiSaccade)
+```{r setup, include = FALSE}
+pacman::p_load(AntiSaccade, papaja, brms)
 ```
+
+## Methods
+```{r}
+data <- RawData_Exp1
+nSub <- length(unique(data$ID))
+data$CTI_center <- data$CTI - min(data$CTI)
+data$CTI <- as.factor(data$CTI)
+```
+
+### Participants
+
+We recruited `r papaja::printnum(nSub)` participant via Prolific. Participants were required to be 18 to 40 years old, speak German as their first language, and have an approval rate of at least 90% when particiapting in studies on Prolific. 
+
+### Design
+
+The goal of the present study was to investigate which processes contribute to performance in the manual Anti-Saccade task. As outlined in the introduction we aimed to separate three processes: sensory discrimination, inhibition, and binding ability. To do so, we compared three different task instructions dsitrubted across three experimental blocks in a letter discrimintation task. The three blocks were a Pro, Anti, and Random Saccade blocks. Details for the procedure in each of the blocks follows in the next section. Within these blocks we varyied the interval between the spatially presented cue and the target from 50, to 100, and 200 milliseconds. The experimenta design thus is a 3x3 within subject design. The order of blocks was randomized across subjects. This was not included in the analysis.  
+
+### Manual Saccade Task
+
+For this experiment, we adapted the Anti-Saccade task from Kane et al. (2001). Participants were instructed to identify which of three possible target letters, a "P", "B", or "R", appeared on screen. The target appeared on one of four peripheral positions on the screen: top, right, bottom, or left. In each trial the target was presented for 100 ms, and was then masked with an "H" appearing for 50ms, and an "8" remaining on screen until the response. Preceeding the target a cue appeared either at the same peripheral location (Pro-Saccade block), the opposite peripheral location (Anti-Saccade block), or at a random peripheral location different to the target location (Random-Saccade block). The cue consited of a flashing "=". Specifically, after the trial started with a fixation cross being presented in the center of the screen for 200 to 1800 ms (varied in steps of 400 ms), the "=" appeared for 100ms, followed by a short blank screen of 50ms, and then the "=" appearing again for 100ms in the same location. The target stimulus then appeared after the offset of the second "=" depending on the current cue-target interval of the current trial: either 50, 100, or 200ms, after being masked as described above.
+
+```{r}
+#knitr::include_graphics()
+```
+
+
+To indicate which letters participants detected they were asked to press the according letter "P", "B", or "R" on the keyboard. We recorded the response given as well as the response time as the time between onset of the target stimulus until the response.
+
+In each block we ran 180 trials. Thus, each of the three letters, appeared once in each of the 4 peripheral location with each of the 5 fixation durations and CTIs.
+
+### Data Analysis
+
+We analyzed the number of correct responses with a Bayesian Generalized Linear Model assuming the number of correct responses to follow a binomial distribution. We used a logit link function, thus estimating the linear model on the logit-scale. The model was estimated using the R package `brms`.
+
+Specifically, we estimated the mean performance in each block and the shortest CTI duration as intercepts, and estimated changes in performance for longer CTIs as deviations from that intercept. We included random effects for both the intercepts for each block, as well as the deviations in performance for longer CTIs:
+
+```{r LinearModel}
+linear_model <- bf(correct | trials(nTrials) ~ 0 + Block:CTI + (0 + Block:CTI || ID))
+```
+
+For all parameters, we used moderately informative normal priors centered on zero with a standard deviation on one.
+
+```{r Priors}
+model_priors <- prior("normal(0,1)", class = b)
+```
+
+We estimated parameter with four independent MCMC chains retaining 10000 samples for each chain after 2000 warmup samples:
+
+```{r SettingsSampling}
+nChains <- 4
+warmup_samples <- 2000
+postwarmup_samples <- 10000
+```
+
+```{r FitModel, include=FALSE}
+fit_binomial <- brms::brm(linear_model,
+                          data = aggregate_data(linear_model, data, family = binomial()),
+                          family = binomial(),
+                          backend = "cmdstanr",
+                          chains = nChains,
+                          iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
+                          prior = model_priors,
+                          save_pars = save_pars(all = T),
+                          sample_prior = T,
+                          file = "fit_Exp1")
+```
+
+## Results
+
+
+
+
+
+
+
+### Descriptives
+
+```{r Fig_Desc, echo=FALSE, fig.height=4, fig.width=6, message=FALSE, warning=FALSE}
+agg_data <- aggregate_data(linear_model, data, family = binomial())
+desc_plot <- plot_descriptives(agg_data, linear_model, family = binomial(), idVar = "ID")
+desc_plot + ggplot2::labs(y = "Proportion Correct", x = "Experimental Block")
+```
+
+### GLM: Accuracy
+
+```{r echo=FALSE}
+hyp_fit <- c(Pro_50v100 = "BlockPro:CTI50 < BlockPro:CTI100",
+             Pro_100v200 = "BlockPro:CTI100 < BlockPro:CTI200",
+             Anti_50v100 = "BlockAnti:CTI50 < BlockAnti:CTI100",
+             Anti_100v200 = "BlockAnti:CTI100 < BlockAnti:CTI200",
+             Random_50v100 = "BlockRandom:CTI50 < BlockRandom:CTI100",
+             Random_100v200 = "BlockRandom:CTI100 < BlockRandom:CTI200")
+
+hypothesis(fit_binomial,hyp_fit)
+```
+

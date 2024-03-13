@@ -17,7 +17,7 @@ aggregate_data <- function(formula, data, family) {
     vars <- all.vars(formula)
   }
 
-  resp_var <- sym(vars[1])
+  resp_var <- dplyr::sym(vars[1])
   vars <- vars[-1]
 
   data_vars <- dplyr::syms(vars[vars %in% names(data)])
