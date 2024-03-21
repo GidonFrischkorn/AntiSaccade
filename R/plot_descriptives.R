@@ -27,7 +27,7 @@ plot_descriptives <- function(data, formula, family ,idVar, file = NULL, clean =
     color_var <- data_vars[[2]]
   }
 
-  plot <- ggplot2::ggplot(data = agg_data,
+  plot <- ggplot2::ggplot(data = data,
                   ggplot2::aes(x = !! data_vars[[1]], y = !!resp_var[[1]] / !!resp_var[[2]],
                       color = !! color_var, fill = !! color_var, shape_var = !! color_var,
                       group = !! color_var)) +
