@@ -31,7 +31,7 @@ data$CTI <- as.factor(data$CTI)
 
 ## Participants
 
-We recruited `r papaja::printnum(nSub)` participant via Prolific. Participants were required to be 18 to 40 years old, speak German as their first language, and have an approval rate of at least 90% when participating in studies on Prolific. 
+We recruited `r papaja::printnum(nSub)` participant via Prolific. Participants were required to be 18 to 40 years old, speak English as their first language, and have an approval rate of at least 90% when participating in studies on Prolific. 
 
 ## Design
 

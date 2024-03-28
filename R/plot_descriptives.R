@@ -34,7 +34,7 @@ plot_descriptives <- function(data, formula, family ,idVar, file = NULL, clean =
     ggplot2::stat_summary(position = ggplot2::position_dodge(0.5)) +
     ggplot2::stat_summary(geom = "line", fun = "mean", position = ggplot2::position_dodge(0.5)) +
     ggplot2::geom_jitter(position = ggplot2::position_jitterdodge(jitter.width = 0.3, dodge.width = .5),
-                alpha = 0.3)
+                alpha = 0.1)
 
   if (clean) {
     plot <- clean_plot(plot)

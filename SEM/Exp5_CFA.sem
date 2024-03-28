@@ -1,0 +1,7 @@
+SD =~ Int_No + Int_Pro + Int_Anti + Int_Random + Int_Central
+Bind =~ CTI_No + CTI_Pro + CTI_Anti
+
+Int_No ~~ NA*Int_Pro
+Int_No ~~ NA*CTI_No
+Int_Pro ~~ NA*CTI_Pro
+CTI_Pro ~~ NA*CTI_Anti
