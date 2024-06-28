@@ -27,6 +27,7 @@ data <- RawData_Exp2
 nSub <- length(unique(data$ID))
 data$CTI_num <- (data$CTI - min(data$CTI))/100
 data$CTI <- as.factor(data$CTI)
+data$RTms <- data$RTms + 150
 ```
 
 ## Participants
@@ -57,7 +58,7 @@ In each block we ran 240 trials. Thus, each of the three letters, appeared once 
 
 ```{r include=FALSE}
 n_full <- nrow(data)
-data <- data %>% filter(RTms > 50, RTms < 5000)
+data <- data %>% filter(RTms > 150, RTms < 10000)
 n_filter <- nrow(data)
 
 prop_filter <- (1 - n_filter/n_full) * 100
@@ -84,7 +85,7 @@ linear_model <- bf(correct | trials(nTrials) ~
 For all parameters, we used moderately informative normal priors centered on zero with a standard deviation on one.
 
 ```{r Priors}
-model_priors <- prior("normal(0,1)", class = b)
+model_priors <- prior("logistic(0,1)", class = b)
 ```
 
 We estimated parameter with four independent MCMC chains retaining 10000 samples for each chain after 2000 warmup samples:
@@ -126,12 +127,13 @@ The summary statistics for the proportion of correct responses in the three diff
 lin_mod <- bf(correct | trials(nTrials) ~ 0 + CTI:Block + (0 + CTI:Block || ID))
 agg_data2 <- aggregate_data(lin_mod, data, family = binomial())
 desc_plot <- plot_descriptives(agg_data2, lin_mod, family = binomial(), idVar = "ID")
-desc_plot + ggplot2::labs(y = "Proportion Correct", x = "Experimental Block")
+desc_plot + ggplot2::labs(y = "Proportion Correct", x = "Experimental Block") +
+  geom_hline(yintercept = 0.33, linetype = "dashed", color = "red")
 ```
 
 ## GLM: Accuracy
 
-```{r FitModel, include=FALSE}
+```{r FitModel, echo=FALSE}
 fit_binomial <- brms::brm(linear_model,
                           data = aggregate_data(linear_model, data, family = model_family),
                           family = model_family,
@@ -141,7 +143,10 @@ fit_binomial <- brms::brm(linear_model,
                           prior = model_priors,
                           save_pars = save_pars(all = T),
                           sample_prior = T,
-                          file = "fit_Exp2")
+                          file = "fit_Exp2",
+                          file_refit = "on_change")
+
+pp_check(fit_binomial, ndraws = 10, type = "dens_overlay_grouped", group = "Block") 
 ```
 
 (ref:post-pred) Posterior predictives of the average proportion correct as a function of CTI duration in the three experimental blocks.
@@ -178,4 +183,4 @@ hyp_results <- hypothesis(fit_binomial,hyp_fit)
 
 Figure \@ref(fig:PredEffects) shows the posterior predictive estimates from the Bayesian GLM for the different experimental blocks and the linear effect of CTI on the proportion correct scale. Comparisons of the posterior estimates indicated that at the shortest CTI (50ms) performance in the Pro-Saccade Block was better than in both the Anti-Saccade, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[1]), format = "g")`, and the Random-Saccade block, , $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[2]), format = "g")`. Different to experiment 1, there was strong evidence in favor for performance at the shortest CTI in the Anti-Saccade block being worse than in the Random-Saccade Block, $BF_{10}$ = `r printnum(1/abs(hyp_results$hypothesis$Evid.Ratio[3]), format = "g")`. 
 
-For both the Pro-Saccade, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[4]), format = "g")`, and the Anti-Saccade Block, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[5]), format = "g")`, there was strong evidence in favor of a linear effect of CTI, leading to better performance for longer CTIs. Again, there was moderate evidence in favor of the CTI effect being equal for these two blocks, $BF_{01}$ = `r printnum(abs(hyp_results$hypothesis$Evid.Ratio[7]), format = "g")`. For the Random-Saccade Block there was neither evidence in favor nor against an effect of CTI on performance, $BF_{01}$ = `r printnum(abs(hyp_results$hypothesis$Evid.Ratio[6]), format = "g")`. So, if anything this effect is small
+For both the Pro-Saccade, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[4]), format = "g")`, and the Anti-Saccade Block, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[5]), format = "g")`, there was strong evidence in favor of a linear effect of CTI, leading to better performance for longer CTIs. Again, there was moderate evidence in favor of the CTI effect being equal for these two blocks, $BF_{01}$ = `r printnum(abs(hyp_results$hypothesis$Evid.Ratio[7]), format = "g")`. For the Random-Saccade Block there was neither evidence in favor nor against an effect of CTI on performance, $BF_{01}$ = `r printnum(abs(hyp_results$hypothesis$Evid.Ratio[6]), format = "g")`. So, if anything this effect is small.

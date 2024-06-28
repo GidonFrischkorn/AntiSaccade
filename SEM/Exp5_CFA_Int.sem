@@ -1,0 +1,7 @@
+SD =~ Int_Central + Int_No + Int_Pro + Int_Anti + Int_Random
+
+Int_No ~~ NA * Int_Pro
+Int_Anti ~~ NA * Int_Random
+
+Int_Central ~~ 0*Int_Central
+

@@ -2,10 +2,10 @@
 title: "Experiment5_MethodsResults"
 output: bookdown::html_document2
 vignette: >
-  %\VignetteIndexEntry{Experiment5_MethodsResults}
+%\VignetteIndexEntry{Experiment5_MethodsResults}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
-pkgdown:
+  pkgdown:
   as_is: true
 ---
 
@@ -25,8 +25,25 @@ options(mc.cores = parallel::detectCores())
 ```{r load_data, include=FALSE}
 data <- RawData_Exp5
 nSub <- length(unique(data$ID))
-data$CTI_num <- (data$CTI - min(data$CTI))/100
+data$CTI_num <- (data$CTI)/100
 data$CTI <- as.factor(data$CTI)
+data$RTms <- data$RTms + 150
+
+inhib_blocks <- c("Anti","Random")
+bind_blocks <- c("Pro","Anti","Colour")
+CueTargetDiff_blocks <- c("Anti","Random","Central","Colour")
+
+Block2Conds <- data.frame(
+  Block = unique(data$Block)
+)
+
+data$inhibition <- ifelse(data$Block %in% inhib_blocks,1,0)
+data$binding <- ifelse(data$Block %in% bind_blocks,1,0)
+data$Pos_CueTarget_diff <- ifelse(data$Block %in% CueTargetDiff_blocks,1,0)
+
+Block2Conds$inhibition <- ifelse(Block2Conds$Block %in% inhib_blocks,1,0)
+Block2Conds$binding <- ifelse(Block2Conds$Block %in% bind_blocks,1,0)
+Block2Conds$Pos_CueTarget_diff <- ifelse(Block2Conds$Block %in% CueTargetDiff_blocks,1,0)
 ```
 
 ## Participants
@@ -61,7 +78,7 @@ In each block we ran 144 trials. Thus, each of the three letters, appeared once 
 
 ```{r include=FALSE}
 n_full <- nrow(data)
-data <- data %>% filter(RTms > 50, RTms < 5000)
+data <- data %>% filter(RTms > 150, RTms < 10000)
 n_filter <- nrow(data)
 
 prop_filter <- (1 - n_filter/n_full) * 100
@@ -72,25 +89,35 @@ Prior to data analysis we removed trials with reaction times shorter than 50 ms 
 We analyzed the number of correct responses with a Bayesian Generalized Linear Model assuming the number of correct responses to follow a binomial distribution. We used a logit link function, thus estimating the linear model on the logit-scale. The model was estimated using the R package `brms`.
 
 ```{r model_family}
-model_family <- brmsfamily("binomial", link = "identity")
+model_family <- brmsfamily("binomial", link = "logit")
 ```
 
 Specifically, we estimated the mean performance in each block at the shortest CTI duration as separate intercepts. We then included a linear CTI effect for each Block to estimate changes in performance as CTIs get longer. We included random effects for the intercepts and linear CTI effects in each Block without estimating the correlations between them:
 
 ```{r LinearModel}
-linear_model <- bf(correct | trials(nTrials) ~ 0.33 + 0.67 * inv_logit(pCorr),
-                   pCorr ~ 
-                     # fixed effects
-                     0 + Block + Block:CTI_num + 
-                     # random effects
-                     (0 + Block + Block:CTI_num | ID),
-                   nl = TRUE)
+saturated_model <- bf(correct | trials(nTrials) ~ 
+                        # fixed effects
+                        0 + Block + Block:CTI_num + 
+                        # random effects
+                        (0 + Block + Block:CTI_num | ID))
+
+theoretical_model <- bf(correct | trials(nTrials) ~ 
+                          AvgPerf - inhibition*(inhibInit * exp(-exp(inhibSlope)*CTI_num)),
+                        AvgPerf ~ 1 + Pos_CueTarget_diff + binding:CTI_num +
+                          (1 + Pos_CueTarget_diff + binding:CTI_num |r| ID),
+                        inhibInit ~ 1 + (1 |r| ID),
+                        inhibSlope ~ 1 + (1 |r|ID),
+                        nl = TRUE
+)
 ```
 
 For all parameters, we used moderately informative normal priors centered on zero with a standard deviation on one.
 
 ```{r Priors}
-model_priors <- prior("normal(0,1)", class = b, nlpar = pCorr)
+saturated_priors <- prior("logistic(0,1)", class = b)
+theoretical_priors <- prior("logistic(0,1)", class = b, nlpar = AvgPerf) +
+  prior("logistic(0,1)", class = b, nlpar = inhibInit) +
+  prior("normal(0,1)", class = b, nlpar = inhibSlope) 
 ```
 
 We estimated parameter with four independent MCMC chains retaining 10000 samples for each chain after 2000 warmup samples:
@@ -107,12 +134,17 @@ postwarmup_samples <- 10000
 
 ```{r Agg_data, include=FALSE}
 lin_model <- bf(correct | trials(nTrials) ~ 
-                     0 + Block + Block:CTI_num + 
-                     # random effects
-                     (0 + Block + Block:CTI_num | ID),
-                   nl = TRUE)
+                  0 + Block + Block:CTI_num + 
+                  # random effects
+                  (0 + Block + Block:CTI_num | ID))
 
-agg_data <- aggregate_data(lin_model, data, family = binomial())
+agg_data <- data %>%
+  dplyr::group_by(ID, Block, Pos_CueTarget_diff, inhibition, binding, CTI_num) %>%
+  dplyr::summarise(
+    correct = sum(correct),
+    nTrials = dplyr::n(),
+    .groups = "drop"
+  )
 ```
 
 ```{r TableDesc, echo=FALSE, fig.align='center', out.width="80%"}
@@ -123,7 +155,7 @@ table_data <- agg_data %>%
             Min = min(correct/nTrials),
             Max = max(correct/nTrials),
             .groups = "drop") %>% 
-  mutate(CTI_num = as.factor(round(CTI_num * 100 + 50)))
+  mutate(CTI_num = as.factor(round(CTI_num * 100)))
 
 names(table_data)[which(names(table_data) == "CTI_num")] <- "CTI"
 
@@ -138,37 +170,52 @@ The summary statistics for the Proportion of correct responses in the three diff
 lin_mod <- bf(correct | trials(nTrials) ~ 0 + CTI:Block + (0 + CTI:Block || ID))
 agg_data2 <- aggregate_data(lin_mod, data, family = binomial())
 desc_plot <- plot_descriptives(agg_data2, lin_mod, family = binomial(), idVar = "ID")
-desc_plot + ggplot2::labs(y = "Proportion Correct", x = "Experimental Block")
+desc_plot + ggplot2::labs(y = "Proportion Correct", x = "Experimental Block") +
+  geom_hline(yintercept = 0.33, linetype = "dashed", color = "red")
 ```
 
 
 ## GLM: Accuracy
 
-```{r FitModel, include=FALSE}
-fit_binomial <- brms::brm(linear_model,
-                          data = agg_data,
-                          family = model_family,
-                          backend = "cmdstanr",
-                          chains = nChains,
-                          iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
-                          prior = model_priors,
-                          save_pars = save_pars(all = T),
-                          sample_prior = T,
-                          file = "fit_Exp5")
+```{r FitModel, echo=FALSE}
+fit_saturated <- brms::brm(saturated_model,
+                           data = agg_data,
+                           family = model_family,
+                           backend = "cmdstanr",
+                           chains = nChains,
+                           iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
+                           prior = saturated_priors,
+                           save_pars = save_pars(all = T),
+                           sample_prior = T,
+                           file = "fit_Exp5_saturated",
+                           file_refit = "on_change")
+
+pp_check(fit_satureade, type = "dens_overlay_grouped", group = "Block", ndraws = 10)
+
+fit_theoretical <- brms::brm(theoretical_model,
+                             data = agg_data,
+                             family = model_family,
+                             backend = "cmdstanr",
+                             chains = nChains,
+                             iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
+                             prior = theoretical_priors,
+                             save_pars = save_pars(all = T),
+                             sample_prior = T,
+                             file = "fit_Exp5_theoretical",
+                             file_refit = "on_change")
+
+pp_check(fit_satureade, type = "dens_overlay_grouped", group = "Block", ndraws = 10)
 ```
 
-(ref:post-pred) Posterior predictives of the average proportion correct as a function of CTI duration in the three experimental blocks.
+(ref:post-pred) Posterior predictive statistics of the average proportion correct as a function of CTI duration in the three experimental blocks.
 
 ```{r PredEffects, echo=FALSE, message=FALSE, warning=FALSE, fig.cap="(ref:post-pred)", fig.align='center'}
-FXplots <- conditional_effects(fit_binomial, nlpar = "pCorr")
+FXplots <- conditional_effects(fit_binomial)
 data_plot <- FXplots$`CTI_num:Block` %>% 
-  mutate(CTI = CTI_num*100 + 50,
-         estimate = inv_logit_scaled(estimate__, lb = 0.33, ub = 1),
-         upper = inv_logit_scaled(upper__, lb = 0.33, ub = 1),
-         lower = inv_logit_scaled(lower__, lb = 0.33, ub = 1))
+  mutate(CTI = CTI_num*100 + 50)
 
 ggplot(data = data_plot,
-       aes(x = CTI, y = estimate, ymin = lower, ymax = upper, group = Block, fill = Block)) +
+       aes(x = CTI, y = estimate__, ymin = lower__, ymax = upper__, group = Block, fill = Block)) +
   geom_line(aes(color = Block)) +
   geom_ribbon(alpha = 0.3) +
   labs(x = "Cue-Target Intervall", y = "Posterior: Proportion Correct") +
@@ -177,25 +224,76 @@ ggplot(data = data_plot,
         panel.grid.major.x = element_blank())
 ```
 
+
+
+```{r echo=FALSE}
+hyp_fit <- c(NoSaccade_Pro = "BlockNoSaccade = BlockPro",
+             NoSaccade_Anti = "BlockNoSaccade = BlockAnti",
+             NoSaccade_Ran = "BlockNoSaccade = BlockRandom",
+             NoSaccade_Cen = "BlockNoSaccade = BlockCentral4",
+             Pro_Anti = "BlockPro = BlockAnti",
+             Pro_Ran = "BlockPro = BlockRandom",
+             Pro_Cen = "BlockPro = BlockCentral4",
+             Anti_Ran = "BlockAnti = BlockRandom",
+             Anti_Cen = "BlockAnti = BlockCentral4",
+             Ran_Cen = "BlockRandom = BlockCentral4",
+             CTI_No = "BlockNoSaccade:CTI_num = 0",
+             CTI_Pro = "BlockPro:CTI_num = 0",
+             CTI_Anti = "BlockAnti:CTI_num = 0",
+             CTI_Ran = "BlockRandom:CTI_num = 0",
+             CTI_Cen4 = "BlockCentral4:CTI_num = 0",
+             CTI_RvC = "BlockRandom:CTI_num = BlockCentral4:CTI_num",
+             CTI_PvA = "BlockPro:CTI_num = BlockAnti:CTI_num",
+             CTI_P_No = "BlockPro:CTI_num = BlockNoSaccade:CTI_num",
+             CTI_A_No = "BlockAnti:CTI_num = BlockNoSaccade:CTI_num",
+             CTI_Bi = "(BlockPro:CTI_num + BlockAnti:CTI_num)/2 = (BlockRandom:CTI_num + BlockCentral4:CTI_num)/2")
+
+hyp_results <- hypothesis(fit_binomial,hyp_fit)
+```
+
+Figure \@ref(fig:PredEffects) shows the posterior predictive estimates from the Bayesian GLM for the different experimental blocks and the linear effect of CTI on the proportion correct scale. Comparisons of the posterior estimates indicated that at the shortest CTI (50ms) performance in all blocks differed from one another $BF_{10}$ = `r printnum(min(abs(1/hyp_results$hypothesis$Evid.Ratio[1:10])), format = "g")`.
+
+For all three blocks there was strong evidence in favor of a positive effect of the CTI on performance, $BF_{10}$ = `r printnum(min(abs(1/hyp_results$hypothesis$Evid.Ratio[11:15])), format = "g")`. There was strong evidence for the effect of CTI being equal for the Pro and Anti Saccade block, $BF_{01}$ = `r printnum(hyp_results$hypothesis$Evid.Ratio[17], format = "g")`, and for the Random and Central Saccade Block, $BF_{01}$ = `r printnum(hyp_results$hypothesis$Evid.Ratio[16], format = "g")`.
+
 ```{r echo=FALSE}
 randFX <- ranef(fit_binomial)$ID
 
 df_randFX <- data.frame(
-  Int_No = randFX[,"Estimate","pCorr_BlockNoSaccade"],
-  Int_Pro = randFX[,"Estimate","pCorr_BlockPro"],
-  Int_Anti = randFX[,"Estimate","pCorr_BlockAnti"],
-  Int_Random = randFX[,"Estimate","pCorr_BlockRandom"],
-  Int_Central = randFX[,"Estimate","pCorr_BlockCentral4"],
-  CTI_No = randFX[,"Estimate","pCorr_BlockNoSaccade:CTI_num"],
-  CTI_Pro = randFX[,"Estimate","pCorr_BlockPro:CTI_num"],
-  CTI_Anti = randFX[,"Estimate","pCorr_BlockAnti:CTI_num"],
-  CTI_Random = randFX[,"Estimate","pCorr_BlockRandom:CTI_num"],
-  CTI_Central = randFX[,"Estimate","pCorr_BlockCentral4:CTI_num"]
+  Int_No = randFX[,"Estimate","BlockNoSaccade"],
+  Int_Pro = randFX[,"Estimate","BlockPro"],
+  Int_Anti = randFX[,"Estimate","BlockAnti"],
+  Int_Random = randFX[,"Estimate","BlockRandom"],
+  Int_Central = randFX[,"Estimate","BlockCentral4"],
+  CTI_No = randFX[,"Estimate","BlockNoSaccade:CTI_num"],
+  CTI_Pro = randFX[,"Estimate","BlockPro:CTI_num"],
+  CTI_Anti = randFX[,"Estimate","BlockAnti:CTI_num"],
+  CTI_Random = randFX[,"Estimate","BlockRandom:CTI_num"],
+  CTI_Central = randFX[,"Estimate","BlockCentral4:CTI_num"]
 )
+```
 
-CFA_model <- readLines(here("SEM","Exp5_CFA.sem"))
 
-fit_cfa <- sem(CFA_model, data = df_randFX, std.ov = T)
-summary(fit_cfa, standardized = T, fit.measures = T) 
-lavResiduals(fit_cfa)
+```{r echo=TRUE}
+CFA_int <- readLines(here("SEM","Exp5_CFA_Int.sem"))
+fit_cfa_int <- sem(CFA_int, data = df_randFX)
+fitMeasures(fit_cfa_int, fit.measures = c("chisq","df","pvalue","cfi","rmsea","srmr"))
+summary(fit_cfa_int, standardized = T) 
+```
+
+```{r echo=TRUE}
+CFA_cti <- readLines(here("SEM","Exp5_CFA_CTI.sem"))
+fit_cfa_cti <- sem(CFA_cti, data = df_randFX)
+fitMeasures(fit_cfa_cti, fit.measures = c("chisq","df","pvalue","cfi","rmsea","srmr"))
+summary(fit_cfa_cti, standardized = T)
+lavResiduals(fit_cfa_cti)
+modindices(fit_cfa_cti, sort = T) 
+```
+
+```{r echo=TRUE}
+CFA_all <- readLines(here("SEM","Exp5_CFA.sem"))
+fit_cfa_all <- sem(CFA_all, data = df_randFX)
+fitMeasures(fit_cfa_all, fit.measures = c("chisq","df","pvalue","cfi","rmsea","srmr"))
+summary(fit_cfa_all, standardized = T)
+lavResiduals(fit_cfa_all)
+modindices(fit_cfa_all, sort = T) 
 ```

@@ -1,7 +1,12 @@
-SD =~ Int_No + Int_Pro + Int_Anti + Int_Random + Int_Central
-Bind =~ CTI_No + CTI_Pro + CTI_Anti
+SD =~ Int_Central + Int_No + Int_Pro + Int_Anti + Int_Random + CTI_Anti
+Speed =~ CTI_No + CTI_Pro + CTI_Anti + CTI_Random + CTI_Central
 
-Int_No ~~ NA*Int_Pro
-Int_No ~~ NA*CTI_No
-Int_Pro ~~ NA*CTI_Pro
-CTI_Pro ~~ NA*CTI_Anti
+Int_No ~~ NA * Int_Pro
+Int_Anti ~~ NA * Int_Random
+CTI_Random ~~ NA*CTI_Central
+
+Int_Central ~~ 0*Int_Central
+
+Int_No ~~ NA * CTI_No
+Int_Pro ~~ NA * CTI_Pro
+Int_Random ~~ NA * CTI_Random

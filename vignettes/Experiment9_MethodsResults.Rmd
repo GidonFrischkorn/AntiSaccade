@@ -2,18 +2,302 @@
 title: "Experiment9_MethodsResults"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Experiment9_MethodsResults}
+%\VignetteIndexEntry{Experiment9_MethodsResults}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
----
-
-```{r, include = FALSE}
+  ---
+  
+  ```{r, include = FALSE}
 knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>"
+collapse = TRUE,
+comment = "#>"
 )
 ```
 
 ```{r setup}
-library(AntiSaccade)
+pacman::p_load(AntiSaccade, papaja, brms, dplyr, ggplot2, here, lavaan)
+options(mc.cores = parallel::detectCores())
+```
+
+```{r load_data, include=FALSE}
+data <- RawData_Exp9 %>% filter(CTI != 200)
+nSub <- length(unique(data$ID))
+data$CTI_num <- (data$CTI)/100
+data$CTI <- as.factor(data$CTI)
+
+inhib_blocks <- c("Anti","Random")
+bind_blocks <- c("Pro","Anti","Colour")
+CueTargetDiff_blocks <- c("Anti","Random","Central","Colour")
+
+Block2Conds <- data.frame(
+  Block = unique(data$Block)
+)
+
+data$inhibition <- ifelse(data$Block %in% inhib_blocks,1,0)
+data$binding <- ifelse(data$Block %in% bind_blocks,1,0)
+data$Pos_CueTarget_diff <- ifelse(data$Block %in% CueTargetDiff_blocks,1,0)
+
+Block2Conds$inhibition <- ifelse(Block2Conds$Block %in% inhib_blocks,1,0)
+Block2Conds$binding <- ifelse(Block2Conds$Block %in% bind_blocks,1,0)
+Block2Conds$Pos_CueTarget_diff <- ifelse(Block2Conds$Block %in% CueTargetDiff_blocks,1,0)
+```
+
+```{r include=FALSE}
+n_full <- nrow(data)
+data <- data %>% filter(RTms > 0, RTms < 10000)
+n_filter <- nrow(data)
+
+prop_filter <- (1 - n_filter/n_full) * 100
+```
+
+```{r model_family}
+model_family <- brmsfamily("binomial", link = "logit")
+```
+
+```{r LinearModel}
+saturated_model <- bf(correct | trials(nTrials) ~ 
+                        # fixed effects
+                        0 + Block + Block:CTI_num + 
+                        # random effects
+                        (0 + Block + Block:CTI_num | ID))
+
+theoretical_model <- bf(correct | trials(nTrials) ~ 
+                          AvgPerf - inhibition*(inhibInit * exp(-exp(inhibSlope)*CTI_num)),
+                        AvgPerf ~ 1 + Pos_CueTarget_diff + binding:CTI_num +
+                          (1 + Pos_CueTarget_diff + binding:CTI_num |r| ID),
+                        inhibInit ~ 1 + (1 |r| ID),
+                        inhibSlope ~ 1 + (1 |r|ID),
+                        nl = TRUE
+)
+```
+
+```{r Priors}
+saturated_priors <- prior("logistic(0,1)", class = b)
+theoretical_priors <- prior("logistic(0,1)", class = b, nlpar = AvgPerf) +
+  prior("logistic(0,1)", class = b, nlpar = inhibInit) +
+  prior("normal(0,1)", class = b, nlpar = inhibSlope) 
+```
+
+```{r sampling_settings}
+nChains <- 4
+warmup_samples <- 2000
+postwarmup_samples <- 10000
+```
+
+```{r Agg_data, include=FALSE}
+lin_model <- bf(correct | trials(nTrials) ~ 
+                  0 + Block + Block:CTI_num + 
+                  # random effects
+                  (0 + Block + Block:CTI_num | ID),
+                nl = TRUE)
+
+agg_data <- data %>%
+  dplyr::group_by(ID, Block, Pos_CueTarget_diff, inhibition, binding, CTI_num) %>%
+  dplyr::summarise(
+    correct = sum(correct),
+    nTrials = dplyr::n(),
+    .groups = "drop"
+  )
+```
+
+```{r TableDesc, echo=FALSE, fig.align='center', out.width="80%"}
+table_data <- agg_data %>% 
+  group_by(Block, CTI_num) %>% 
+  summarise(Mean = mean(correct/nTrials),
+            SD = sd(correct/nTrials),
+            Min = min(correct/nTrials),
+            Max = max(correct/nTrials),
+            .groups = "drop") %>% 
+  mutate(CTI_num = as.factor(round(CTI_num * 100)))
+
+names(table_data)[which(names(table_data) == "CTI_num")] <- "CTI"
+
+apa_table(table_data,
+          caption = "Desciptive statistiscs for the proportion correct in all experimental conditions.",
+          landscape = TRUE)
+```
+
+```{r FigDesc, echo=FALSE, fig.align='center', fig.height=4, fig.width=6, message=FALSE, warning=FALSE, fig.cap="Descriptive plots of the average performance and performance of each subject in each block across the different CTI durations"}
+lin_mod <- bf(correct | trials(nTrials) ~ 
+                1 + Pos_CueTarget_diff + inhibition*CTI + binding*CTI +
+                (1 + Pos_CueTarget_diff + inhibition*CTI + binding*CTI | ID))
+agg_data3 <- aggregate_data(lin_mod, data, family = binomial())
+
+desc_plot <- ggplot(data = agg_data2,
+                    aes(x = as.factor(CTI_num), y = correct/nTrials, color = as.factor(Block), fill = as.factor(Block), 
+                        group = as.factor(Block), shape = as.factor(Pos_CueTarget_diff))) +
+  facet_grid(inhibition ~ binding, labeller = label_both) +
+  stat_summary(position = position_dodge(0.5)) +
+  ggplot2::stat_summary(geom = "line", fun = "mean", position = ggplot2::position_dodge(0.5)) +
+  ggplot2::geom_jitter(position = ggplot2::position_jitterdodge(jitter.width = 0.3, dodge.width = .5),
+                       alpha = 0.1) +
+  geom_hline(yintercept = 0.33, color = "red", linetype = "dashed") +
+  labs(x = "Cue-Target Interval",
+       y = "Proportion Correct",
+       color = "Block", fill = "Block",
+       shape = "Pos Cue = Target",
+       title = "Descriptive Plot") +
+  coord_cartesian(ylim = c(0,1))
+ggsave(filename = "Descriptives.jpg",desc_plot, dpi = 300, width = 7, height = 6)
+desc_plot
+```
+
+
+```{r FitModel, include=FALSE}
+fit_saturated <- brms::brm(saturated_model,
+                          data = agg_data,
+                          family = model_family,
+                          backend = "cmdstanr",
+                          chains = nChains,
+                          iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
+                          prior = saturated_priors,
+                          save_pars = save_pars(all = T),
+                          sample_prior = T,
+                          file = "fit_Exp9_saturated",
+                          file_refit = "on_change")
+
+fit_theoretical <- brms::brm(theoretical_model,
+                           data = agg_data,
+                           family = model_family,
+                           backend = "cmdstanr",
+                           chains = nChains,
+                           iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
+                           prior = theoretical_priors,
+                           save_pars = save_pars(all = T),
+                           sample_prior = T,
+                           file = "fit2_Exp9_theoretical",
+                           file_refit = "on_change")
+
+newdata <- expand_grid(
+  ID = unique(agg_data$ID),
+  nTrials = 1,
+  CTI_num = c(0.5,4.0),
+  Block = unique(agg_data$Block)
+)
+
+newdata2 <- expand.grid(
+  ID = unique(agg_data$ID),
+  nTrials = 1,
+  CTI_num = c(0.5,4.0),
+  binding = c(0,1),
+  inhibition = c(0,1),
+  Pos_CueTarget_diff = c(0,1)
+) %>% 
+  filter(!(Pos_CueTarget_diff == 0 & inhibition == 1))
+
+tidy_pred_saturated <- fit_saturated %>% 
+  tidybayes::epred_draws(newdata = newdata) %>% 
+  group_by(ID, CTI_num, Block) %>% 
+  summarise(predValue = mean(.epred)) %>% 
+  left_join(Block2Conds)
+
+pp_plot_saturated <- ggplot(data = tidy_pred_saturated,
+                  aes(x = as.factor(CTI_num), y = predValue, color = as.factor(Block), fill = as.factor(Block), 
+                      group = as.factor(Block), shape = as.factor(Pos_CueTarget_diff))) +
+  facet_grid(inhibition ~ binding, labeller = label_both) +
+  stat_summary(position = position_dodge(0.5)) +
+  ggplot2::stat_summary(geom = "line", fun = "mean", position = ggplot2::position_dodge(0.5)) +
+  ggplot2::geom_jitter(position = ggplot2::position_jitterdodge(jitter.width = 0.3, dodge.width = .5),
+                       alpha = 0.1) +
+  geom_hline(yintercept = 0.33, color = "red", linetype = "dashed") +
+  labs(x = "Cue-Target Interval",
+       y = "Proportion Correct",
+       color = "Block", fill = "Block",
+       shape = "Pos Cue = Target",
+       title = "Posterior Predictives (Saturated)") +
+  coord_cartesian(ylim = c(0,1))
+ggsave(filename = "PostPredictives_Saturated.jpg",pp_plot_saturated, dpi = 300, width = 7, height = 6)
+
+pp_check(fit_saturated, ndraws = 10, type = "dens_overlay_grouped", group = "Block")
+
+tidy_pred_theoretical <- fit_theoretical %>% 
+  tidybayes::epred_draws(newdata = newdata2) %>% 
+  group_by(ID, CTI_num, binding, inhibition, Pos_CueTarget_diff) %>% 
+  summarise(predValue = mean(.epred)) %>% 
+  left_join(Block2Conds)
+
+pp_plot_theoretical <- ggplot(data = tidy_pred_theoretical,
+                   aes(x = as.factor(CTI_num), y = predValue, color = as.factor(Block), fill = as.factor(Block), 
+                       group = as.factor(Block), shape = as.factor(Pos_CueTarget_diff))) +
+  facet_grid(inhibition ~ binding, labeller = label_both) +
+  stat_summary(position = position_dodge(0.5)) +
+  ggplot2::stat_summary(geom = "line", fun = "mean", position = ggplot2::position_dodge(0.5)) +
+  ggplot2::geom_jitter(position = ggplot2::position_jitterdodge(jitter.width = 0.3, dodge.width = .5),
+                       alpha = 0.1) +
+  geom_hline(yintercept = 0.33, color = "red", linetype = "dashed") +
+  labs(x = "Cue-Target Interval",
+       y = "Proportion Correct",
+       color = "Block", fill = "Block",
+       shape = "Pos Cue = Target",
+       title = "Posterior Predictives (Theoretical)") +
+  coord_cartesian(ylim = c(0,1))
+ggsave(filename = "PostPredictives_theoretical.jpg",pp_plot_theoretical, dpi = 300, width = 7, height = 6)
+
+pp_check(fit_binomial2, ndraws = 10, type = "dens_overlay_grouped", group = "Pos_CueTarget_diff")
+pp_check(fit_binomial2, ndraws = 10, type = "dens_overlay_grouped", group = "binding")
+pp_check(fit_binomial2, ndraws = 10, type = "dens_overlay_grouped", group = "inhibition")
+
+# bridge_fit <- bridge_sampler(fit_binomial, cores = 4, repetition = 20)
+# bridge_fit2 <- bridge_sampler(fit_binomial, cores = 4, repetition = 20)
+# bayes_factor(bridge_fit, bridge_fit2)
+```
+
+
+
+
+```{r PredEffects, echo=FALSE, message=FALSE, warning=FALSE, fig.cap="(ref:post-pred)", fig.align='center'}
+FXplots <- conditional_effects(fit_binomial2)
+
+data_plot <- FXplots$`CTI_num:Block` %>% 
+  mutate(CTI = CTI_num*100 + 50,
+         estimate = inv_logit_scaled(estimate__, lb = 0.33, ub = 1),
+         upper = inv_logit_scaled(upper__, lb = 0.33, ub = 1),
+         lower = inv_logit_scaled(lower__, lb = 0.33, ub = 1))
+
+ggplot(data = data_plot,
+       aes(x = CTI, y = estimate, ymin = lower, ymax = upper, group = Block, fill = Block)) +
+  geom_line(aes(color = Block)) +
+  geom_ribbon(alpha = 0.3) +
+  labs(x = "Cue-Target Intervall", y = "Posterior: Proportion Correct") +
+  theme_bw() +
+  theme(panel.grid.minor.x = element_blank(),
+        panel.grid.major.x = element_blank())
+```
+
+```{r echo=FALSE}
+randFX <- ranef(fit_binomial)$ID
+
+df_randFX <- data.frame(
+  Int_No = randFX[,"Estimate","BlockNo"],
+  Int_Pro = randFX[,"Estimate","BlockPro"],
+  Int_Anti = randFX[,"Estimate","BlockAnti"],
+  Int_Random = randFX[,"Estimate","BlockRandom"],
+  Int_Central = randFX[,"Estimate","BlockCentral"],
+  Int_Color = randFX[,"Estimate","BlockColour"],
+  CTI_No = randFX[,"Estimate","BlockNo:CTI_num"],
+  CTI_Pro = randFX[,"Estimate","BlockPro:CTI_num"],
+  CTI_Anti = randFX[,"Estimate","BlockAnti:CTI_num"],
+  CTI_Random = randFX[,"Estimate","BlockRandom:CTI_num"],
+  CTI_Central = randFX[,"Estimate","BlockCentral:CTI_num"],
+  CTI_Color = randFX[,"Estimate","BlockColour:CTI_num"]
+)
+```
+
+```{r echo=TRUE}
+CFA_int <- readLines(here("SEM","Exp9_CFA_Int.sem"))
+fit_cfa_int <- sem(CFA_int, data = df_randFX, orthogonal = T, std.ov = T)
+fitMeasures(fit_cfa_int, fit.measures = c("chisq","df","pvalue","cfi","rmsea","srmr"))
+summary(fit_cfa_int, standardized = T)
+
+lavResiduals(fit_cfa_int)
+modindices(fit_cfa_cti, sort = T) 
+```
+
+```{r echo=TRUE}
+CFA_cti <- readLines(here("SEM","Exp9_CFA_CTI.sem"))
+fit_cfa_cti <- sem(CFA_cti, data = df_randFX, std.ov = T)
+fitMeasures(fit_cfa_cti, fit.measures = c("chisq","df","pvalue","cfi","rmsea","srmr"))
+summary(fit_cfa_cti, standardized = T)
+lavResiduals(fit_cfa_cti)
+modindices(fit_cfa_cti, sort = T) 
 ```

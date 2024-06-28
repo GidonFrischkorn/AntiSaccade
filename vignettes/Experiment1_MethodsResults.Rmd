@@ -25,8 +25,6 @@ options(mc.cores = parallel::detectCores())
 ```{r load_data, include=FALSE}
 data <- RawData_Exp1
 nSub <- length(unique(data$ID))
-data$CTI_num <- (data$CTI - min(data$CTI))/100
-data$CTI <- as.factor(data$CTI)
 ```
 
 ## Participants
@@ -56,8 +54,14 @@ In each block we ran 180 trials. Thus, each of the three letters, appeared once 
 ## Data Analysis
 
 ```{r include=FALSE}
+
+data$CTI_num <- (data$CTI - min(data$CTI))/100
+data$CTI <- as.factor(data$CTI)
+
+data$RTms <- data$RTms + 150
+
 n_full <- nrow(data)
-data <- data %>% filter(RTms > 50, RTms < 5000)
+data <- data %>% filter(RTms > 150, RTms < 10000)
 n_filter <- nrow(data)
 
 prop_filter <- (1 - n_filter/n_full) * 100
@@ -84,7 +88,7 @@ linear_model <- bf(correct | trials(nTrials) ~
 For all parameters, we used moderately informative normal priors centered on zero with a standard deviation on one.
 
 ```{r Priors}
-model_priors <- prior("normal(0,1)", class = b)
+model_priors <- prior("logistic(0,1)", class = b)
 ```
 
 We estimated parameter with four independent MCMC chains retaining 10000 samples for each chain after 2000 warmup samples:
@@ -126,12 +130,13 @@ The summary statistics for the proportion of correct responses in the three diff
 lin_mod <- bf(correct | trials(nTrials) ~ 0 + CTI:Block + (0 + CTI:Block || ID))
 agg_data2 <- aggregate_data(lin_mod, data, family = binomial())
 desc_plot <- plot_descriptives(agg_data2, lin_mod, family = binomial(), idVar = "ID")
-desc_plot + ggplot2::labs(y = "Proportion Correct", x = "Experimental Block")
+desc_plot + ggplot2::labs(y = "Proportion Correct", x = "Experimental Block") +
+  geom_hline(yintercept = 0.33, linetype = "dashed", color = "red")
 ```
 
 ## GLM: Accuracy
 
-```{r FitModel, include=FALSE}
+```{r FitModel, echo=FALSE}
 fit_binomial <- brms::brm(linear_model,
                           data = aggregate_data(linear_model, data, family = model_family),
                           family = model_family,
@@ -141,7 +146,10 @@ fit_binomial <- brms::brm(linear_model,
                           prior = model_priors,
                           save_pars = save_pars(all = T),
                           sample_prior = T,
-                          file = "fit_Exp1")
+                          file = "fit_Exp1",
+                          file_refit = "on_change")
+
+pp_check(fit_binomial, ndraws = 10, type = "dens_overlay_grouped", group = "Block") 
 ```
 
 (ref:post-pred) Posterior predictives of the average proportion correct as a function of CTI duration in the three experimental blocks.

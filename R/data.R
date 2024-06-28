@@ -21,7 +21,6 @@
 #'   \item{correct}{Logical variable indicating the response was correct (TRUE) or incorrect (FALSE)}
 #'   \item{RTms}{Reaction Time of the response in milliseconds}
 #' }
-#' @source
 "RawData_Exp1"
 
 #' Raw Data of the second Saccade Experiment
@@ -47,7 +46,6 @@
 #'   \item{correct}{Logical variable indicating the response was correct (TRUE) or incorrect (FALSE)}
 #'   \item{RTms}{Reaction Time of the response in milliseconds}
 #' }
-#' @source
 "RawData_Exp2"
 
 #' Raw Data of the third Saccade Experiment
@@ -74,7 +72,6 @@
 #'   \item{correct}{Logical variable indicating the response was correct (TRUE) or incorrect (FALSE)}
 #'   \item{RTms}{Reaction Time of the response in milliseconds}
 #' }
-#' @source
 "RawData_Exp3"
 
 #' Raw Data of the fourth Saccade Experiment
@@ -101,7 +98,6 @@
 #'   \item{correct}{Logical variable indicating the response was correct (TRUE) or incorrect (FALSE)}
 #'   \item{RTms}{Reaction Time of the response in milliseconds}
 #' }
-#' @source
 "RawData_Exp4"
 
 #' Raw Data of the fifth Saccade Experiment (Individual Diff. Study 1)
@@ -128,7 +124,6 @@
 #'   \item{correct}{Logical variable indicating the response was correct (TRUE) or incorrect (FALSE)}
 #'   \item{RTms}{Reaction Time of the response in milliseconds}
 #' }
-#' @source
 "RawData_Exp5"
 
 #' Raw Data of the sixth Saccade Experiment
@@ -155,7 +150,6 @@
 #'   \item{correct}{Logical variable indicating the response was correct (TRUE) or incorrect (FALSE)}
 #'   \item{RTms}{Reaction Time of the response in milliseconds}
 #' }
-#' @source
 "RawData_Exp6"
 
 #' Raw Data of the seventh Saccade Experiment
@@ -182,7 +176,6 @@
 #'   \item{correct}{Logical variable indicating the response was correct (TRUE) or incorrect (FALSE)}
 #'   \item{RTms}{Reaction Time of the response in milliseconds}
 #' }
-#' @source
 "RawData_Exp7"
 
 #' Raw Data of the eight Saccade Experiment
@@ -210,7 +203,6 @@
 #'   \item{correct}{Logical variable indicating the response was correct (TRUE) or incorrect (FALSE)}
 #'   \item{RTms}{Reaction Time of the response in milliseconds}
 #' }
-#' @source
 "RawData_Exp8"
 
 #' Raw Data of the ninth Saccade Experiment (Individual Diff. Study 2)
@@ -237,7 +229,6 @@
 #'   \item{correct}{Logical variable indicating the response was correct (TRUE) or incorrect (FALSE)}
 #'   \item{RTms}{Reaction Time of the response in milliseconds}
 #' }
-#' @source
 "RawData_Exp9"
 
 
@@ -249,8 +240,6 @@
 #'   \item{task}{The task within Experiment 9 from which the data stem from}
 #'   \item{ID}{Unique integer code for each subject who participated in the experiment}
 #'   \item{trialNum}{The trial number of the current trial}
-#'   \item{cueLoc}{The cue location coded as a numeric value from 1 to 4.
-#'   1 = "top", 2 = "right", 3 = "bottom", 4 = "left"}
 #'   \item{trialType}{character labeling the trial type: "exp" for experimental trials, "prac" for practice trials}
 #'   \item{taskDiff}{The difficulty of the current trial. This was varied on three levels: easy, medium, hard. For details on the difficulty manipulation see the task description.}
 #'   \item{correctResponse}{The response key that was associated to the correct response: either "left" or "right"}
@@ -258,5 +247,24 @@
 #'   \item{correct}{Logical variable indicating the response was correct (TRUE) or incorrect (FALSE)}
 #'   \item{RTms}{Reaction Time of the response in milliseconds}
 #' }
-#' @source
 "Exp9_ProcSpeed"
+
+#' Raw Data of processing speed covariated from Experiment 9 (Individual Diff. Study 2)
+#'
+#' @format ## `Exp9_WorkingMemory`
+#' A data frame with 47160 rows and 13 columns:
+#' \describe{
+#'   \item{task}{The task within Experiment 9 from which the data stem from}
+#'   \item{ID}{Unique integer code for each subject who participated in the experiment}
+#'   \item{trialNum}{The trial number of the current trial}
+#'   \item{setsize}{The number of items to be maintained in memory for retrieval.}
+#'   \item{whatRet}{Character variable coding what information should be retrieved (or processes for the processing task
+#'   of the complex span task)}
+#'   \item{encPos}{The serial position during the encoding procedure}
+#'   \item{retPos}{The serial position during the retrieval procedure}
+#'   \item{correctResponse}{The correct response that should have been given.}
+#'   \item{response}{The response given by the subject.}
+#'   \item{correct}{Logical variable indicating the response was correct (TRUE) or incorrect (FALSE)}
+#'   \item{RTms}{Reaction Time of the response in milliseconds}
+#' }
+"Exp9_WorkingMemory"
