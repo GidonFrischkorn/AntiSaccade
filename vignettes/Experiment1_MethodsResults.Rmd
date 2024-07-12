@@ -1,14 +1,8 @@
 ---
 title: "Experiment 1: Methods & Results"
-output: bookdown::html_document2
-vignette: >
-  %\VignetteIndexEntry{Experiment1_MethodsResults}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
-pkgdown:
-  as_is: true
+output: html_document
 ---
-  
+
 ```{r chunk_opts, include = FALSE}
 knitr::opts_chunk$set(
 collapse = TRUE,
@@ -22,6 +16,7 @@ options(mc.cores = parallel::detectCores())
 ```
 
 # Methods
+
 ```{r load_data, include=FALSE}
 data <- RawData_Exp1
 nSub <- length(unique(data$ID))
@@ -29,19 +24,19 @@ nSub <- length(unique(data$ID))
 
 ## Participants
 
-We recruited `r papaja::printnum(nSub)` participant via Prolific. Participants were required to be 18 to 40 years old, speak German as their first language, and have an approval rate of at least 90% when participating in studies on Prolific. 
+We recruited `r papaja::printnum(nSub)` participant via Prolific. Participants were required to be 18 to 40 years old, speak German as their first language, and have an approval rate of at least 90% when participating in studies on Prolific.
 
 ## Design
 
-The goal of the present study was to investigate which processes contribute to performance in the manual Anti-Saccade task. As outlined in the introduction we aimed to separate three processes: sensory discrimination, inhibition, and binding ability. To do so, we compared three different task instructions distributed across three experimental blocks in a letter discrimination task. The three blocks were a Pro, Anti, and Random Saccade blocks. Details for the procedure in each of the blocks follows in the next section. Within these blocks we varied the interval between the spatially presented cue and the target from 50, to 100, and 200 milliseconds. The experimental design thus is a 3x3 within subject design. The order of blocks was randomized across subjects. This was not included in the analysis.  
+The goal of the present study was to investigate which processes contribute to performance in the manual Anti-Saccade task. As outlined in the introduction we aimed to separate three processes: sensory discrimination, inhibition, and binding ability. To do so, we compared three different task instructions distributed across three experimental blocks in a letter discrimination task. The three blocks were a Pro, Anti, and Random Saccade block. Details for the procedure in each of the blocks follows in the next section. Within these blocks we varied the interval between the spatially presented cue and the target from 50, to 100, and 200 milliseconds. The experimental design thus is a 3 (block) x 3 (cue-target interval) within subject design. The order of blocks was randomized across subjects. The random order was not included in the analysis.
 
 ## Manual Saccade Task
 
-For this experiment, we adapted the Anti-Saccade task from Kane et al. (2001). Participants were instructed to identify which of three possible target letters, a "P", "B", or "R", appeared on screen. The target appeared on one of four peripheral positions on the screen: top, right, bottom, or left. In each trial the target was presented for 100 ms, and was then masked with an "H" appearing for 50ms, and an "8" remaining on screen until the response. Preceding the target a cue appeared either at the same peripheral location (Pro-Saccade block), the opposite peripheral location (Anti-Saccade block), or at a random peripheral location different to the target location (Random-Saccade block). The cue consisted of a flashing "=". Specifically, after the trial started with a fixation cross being presented in the center of the screen for 200 to 1800 ms (varied in steps of 400 ms), the "=" appeared for 100ms, followed by a short blank screen of 50ms, and then the "=" appearing again for 100ms in the same location. The target stimulus then appeared after the offset of the second "=" depending on the current cue-target interval of the current trial: either 50, 100, or 200ms, after being masked as described above. See Fig. \@ref(fig:figST) below.
+For this experiment, we adapted the Anti-Saccade task from Kane et al. (2001). Participants were instructed to identify which of three possible target letters, a "P", "B", or "R", appeared on the screen. The target appeared on one of four peripheral positions on the screen: top, right, bottom, or left. In each trial the target was presented for 100 ms, and was then masked with an "H" appearing for 50ms, and an "8" remaining on screen until the response. Preceding the target a cue appeared either at the same peripheral location (Pro-Saccade block), the opposite peripheral location (Anti-Saccade block), or at a random peripheral location different to the target location (Random-Saccade block). The cue consisted of a flashing "=". Specifically, after the trial started with a fixation cross being presented in the center of the screen for 200 to 1800 ms (varied in steps of 400 ms), the "=" appeared for 100ms, followed by it dissapperaring from the screen of 50ms, and then reappearing again for 100ms in the same location. The target stimulus then appeared after the offset of the second "=" depending on the cue-target interval implemented in the current trial: either 50, 100, or 200ms, after the offset of the "=" and then being masked as described above. See Fig. \@ref(fig:figST) below.
 
-(ref:description) Illustration of the procedure of one trial in the manual saccade task. 
+(ref:description) Illustration of the procedure of one trial in the manual saccade task.
 
-(ref:trial-type) The depicted trial is from an anti-saccade block. 
+(ref:trial-type) The depicted trial is from an anti-saccade block.
 
 ```{r figST, echo=FALSE, fig.align='center', out.width="80%", fig.cap = paste("(ref:description)", "(ref:trial-type)")}
 knitr::include_graphics(path = "Figure_SaccadeTask.png")
@@ -67,7 +62,7 @@ n_filter <- nrow(data)
 prop_filter <- (1 - n_filter/n_full) * 100
 ```
 
-Prior to data analysis we removed trials with reaction times shorter than 50 ms and longer than 5000ms. This resulted in discarding `r papaja::printnum(prop_filter)`% of data.
+Prior to data analysis we removed trials with reaction times shorter than 50 ms and longer than 10000ms. This resulted in discarding `r papaja::printnum(prop_filter)`% of data.
 
 We analyzed the number of correct responses with a Bayesian Generalized Linear Model assuming the number of correct responses to follow a binomial distribution. We used a logit link function, thus estimating the linear model on the logit-scale. The model was estimated using the R package `brms`.
 
@@ -85,13 +80,13 @@ linear_model <- bf(correct | trials(nTrials) ~
                      (0 + Block + Block:CTI_num | ID))
 ```
 
-For all parameters, we used moderately informative normal priors centered on zero with a standard deviation on one.
+For all parameters, we used moderately informative logistic priors centered on zero with a standard deviation on one. The CTI variable was centered on the shortest CTI duration and divided by 100, thus the CTI effect represents changes in performance for a CTI change of a 1/10th of a second (i.e. 100 ms). 
 
 ```{r Priors}
 model_priors <- prior("logistic(0,1)", class = b)
 ```
 
-We estimated parameter with four independent MCMC chains retaining 10000 samples for each chain after 2000 warmup samples:
+We estimated parameters with four independent MCMC chains retaining 10000 samples for each chain after 2000 warm-up samples:
 
 ```{r sampling_settings}
 nChains <- 4
@@ -130,14 +125,14 @@ The summary statistics for the proportion of correct responses in the three diff
 lin_mod <- bf(correct | trials(nTrials) ~ 0 + CTI:Block + (0 + CTI:Block || ID))
 agg_data2 <- aggregate_data(lin_mod, data, family = binomial())
 desc_plot <- plot_descriptives(agg_data2, lin_mod, family = binomial(), idVar = "ID")
-desc_plot + ggplot2::labs(y = "Proportion Correct", x = "Experimental Block") +
+desc_plot + ggplot2::labs(y = "Proportion Correct", x = "Cue-Target Interval") +
   geom_hline(yintercept = 0.33, linetype = "dashed", color = "red")
 ```
 
 ## GLM: Accuracy
 
 ```{r FitModel, echo=FALSE}
-fit_binomial <- brms::brm(linear_model,
+fit_E1_saturated <- brms::brm(linear_model,
                           data = aggregate_data(linear_model, data, family = model_family),
                           family = model_family,
                           backend = "cmdstanr",
@@ -146,28 +141,38 @@ fit_binomial <- brms::brm(linear_model,
                           prior = model_priors,
                           save_pars = save_pars(all = T),
                           sample_prior = T,
-                          file = "fit_Exp1",
+                          file = "fit_Exp1_saturated",
                           file_refit = "on_change")
 
-pp_check(fit_binomial, ndraws = 10, type = "dens_overlay_grouped", group = "Block") 
-```
+posterior_predict_plot <- pp_check(fit_E1_saturated, ndraws = 10, type = "dens_overlay_grouped", group = "Block")
 
-(ref:post-pred) Posterior predictives of the average proportion correct as a function of CTI duration in the three experimental blocks.
+newdata <- expand.grid(
+  ID = unique(fit_E1_saturated$data$ID),
+  nTrials = 1,
+  Block = unique(fit_E1_saturated$data$Block),
+  CTI_num = unique(fit_E1_saturated$data$CTI_num)
+)
 
-```{r PredEffects, echo=FALSE, message=FALSE, warning=FALSE, fig.cap="(ref:post-pred)", fig.align='center'}
-FXplots <- conditional_effects(fit_binomial)
-data_plot <- FXplots$`CTI_num:Block` %>% 
-  mutate(CTI = CTI_num*100 + 50)
+tidy_pred_saturated <- fit_E1_saturated %>% 
+  tidybayes::epred_draws(newdata = newdata) %>% 
+  group_by(ID, CTI_num, Block) %>% 
+  summarise(predValue = mean(.epred)) %>% 
+  mutate(CTI_num = (CTI_num + 0.5)*100)
 
-ggplot(data = data_plot,
-       aes(x = CTI, y = estimate__, ymin = lower__, ymax = upper__, group = Block, fill = Block)) +
-  geom_line(aes(color = Block)) +
-  geom_ribbon(alpha = 0.3) +
-  labs(x = "Cue-Target Intervall", y = "Posterior: Proportion Correct") +
-  theme_bw() +
-  theme(panel.grid.minor.x = element_blank(),
-        panel.grid.major.x = element_blank()) +
-  coord_cartesian(ylim = c(0.8,1))
+ggplot(data = tidy_pred_saturated,
+       aes(y = predValue, x = as.factor(CTI_num), 
+           color = as.factor(Block), group = as.factor(Block))) +
+  geom_jitter(alpha = 0.3) +
+  stat_summary(position = position_dodge(0.2)) +
+  stat_summary(geom = "line", fun = mean, position = position_dodge(0.2)) +
+  stat_summary(data = agg_data, aes(x = as.factor((CTI_num+0.5)*100), y = correct/nTrials),
+               geom = "point", fun = mean, position = position_dodge(0.2), 
+               color = "black", shape = "cross", size = 3) +
+  geom_hline(yintercept = 1/3, color = "darkred", linetype = "dashed") +
+  labs(x = "Cue-Target Interval (in ms)",
+       y = "Proportion Correct",
+       color = "Block", fill = "Block") +
+  theme_classic()
 ```
 
 
@@ -182,10 +187,9 @@ hyp_fit <- c(Pro_Ant = "BlockPro = BlockAnti",
              CTI_P2R = "BlockPro:CTI_num = BlockRandom:CTI_num",
              CTI_R2A = "BlockRandom:CTI_num = BlockAnti:CTI_num")
 
-hyp_results <- hypothesis(fit_binomial,hyp_fit)
+hyp_results <- hypothesis(fit_E1_saturated,hyp_fit)
 ```
 
-Figure \@ref(fig:PredEffects) shows the posterior predictive estimates from the Bayesian GLM for the different experimental blocks and the linear effect of CTI on the proportion correct scale. Comparisons of the posterior estimates indicated that at the shortest CTI (50ms) performance in the Pro-Saccade Block was better than in both the Anti-Saccade, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[1]), format = "g")`, and the Random-Saccade block, , $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[2]), format = "g")`. Although descriptively performance in the Anti-Saccade block was lower than in the Random-Saccade Block, there was moderate evidence in favor of the performance being equal in these two blocks at the shortest CTI condition, $BF_{01}$ = `r printnum(abs(hyp_results$hypothesis$Evid.Ratio[3]), format = "g")`. 
+Figure \@ref(fig:PredEffects) shows the posterior predictive estimates from the Bayesian GLM for the different experimental blocks and the linear effect of CTI on the proportion correct scale. Comparisons of the posterior estimates indicated that at the shortest CTI (50ms) performance in the Pro-Saccade Block was better than in both the Anti-Saccade, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[1]), format = "g")`, and the Random-Saccade block, , $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[2]), format = "g")`. Although descriptively performance in the Anti-Saccade block was lower than in the Random-Saccade Block, there was inconclusive evidence with respect to performance being different in these two blocks at the shortest CTI condition, $BF_{01}$ = `r printnum(abs(hyp_results$hypothesis$Evid.Ratio[3]), format = "g")`.
 
-For both the Pro-Saccade, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[4]), format = "e")`, and the Anti-Saccade Block, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[5]), format = "g")`, there was strong evidence in favor of a linear effect of CTI, leading to better performance for longer CTIs. There was even evidence in favor of the CTI effect being equal for these two blocks, $BF_{01}$ = `r printnum(abs(hyp_results$hypothesis$Evid.Ratio[7]), format = "g")`. For the Random-Saccade Block there was neither evidence in favor nor against an effect of CTI on performance, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[6]), format = "g")`.  
-
+For both the Pro-Saccade, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[4]), format = "e")`, and the Anti-Saccade Block, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[5]), format = "g")`, there was strong evidence in favor of a linear effect of CTI, leading to better performance for longer CTIs. There was even evidence in favor of the CTI effect being equal for these two blocks, $BF_{01}$ = `r printnum(abs(hyp_results$hypothesis$Evid.Ratio[7]), format = "g")`. For the Random-Saccade Block there was neither evidence in favor nor against an effect of CTI on performance, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[6]), format = "g")`.

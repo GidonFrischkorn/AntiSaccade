@@ -5,5 +5,8 @@
 .httr-oauth
 .DS_Store
 local/
-docs
 inst/doc
+
+# file types not to be included
+*.docx
+*.rds

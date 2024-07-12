@@ -1,5 +1,3 @@
 Speed =~ CTI_No + CTI_Pro + CTI_Anti + CTI_Random + CTI_Central + CTI_Color
 
-CTI_Anti ~~ NA * CTI_Pro
-CTI_Pro ~~ NA * CTI_No
 

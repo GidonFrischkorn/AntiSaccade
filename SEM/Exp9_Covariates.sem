@@ -1,0 +1,5 @@
+ST =~ Baseline + SacFromFix + filter + Binding
+
+Baseline ~~ NA*SacFromFix
+
+ST ~~ NA*WMC_g + NA*PS_g
