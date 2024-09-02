@@ -1,0 +1,7 @@
+a =~ a_HT + a_NJ + a_CJ
+
+a_HT ~ 0
+a_NJ ~ 0
+a_CJ ~ 0
+
+a_NJ ~~ 0*a_NJ

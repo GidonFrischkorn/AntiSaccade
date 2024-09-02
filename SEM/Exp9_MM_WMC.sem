@@ -1,2 +1,4 @@
-WMC_g =~ CS + STM + UP
+WMC_g =~ b1*STM + b1*UP
 
+STM ~ 0
+UP ~0

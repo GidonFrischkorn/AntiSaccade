@@ -1,1 +1,5 @@
-PS_g =~ CJ + HT + NJ
+v =~ v_HT + v_NJ + v_CJ
+
+v_HT ~ 0
+v_NJ ~ 0
+v_CJ ~ 0

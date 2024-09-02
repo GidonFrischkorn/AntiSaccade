@@ -1,6 +1,6 @@
 ---
-title: "Experiment1: Methods & Results"
-output: html_document
+title: "Experiment5_MethodsResults"
+output: bookdown::html_document2
 pkgdown:
   as_is: true
 ---
@@ -25,10 +25,12 @@ data$CTI_num <- (data$CTI)/100
 data$CTI <- as.factor(data$CTI)
 data$RTms <- data$RTms + 150
 
+levels(data$Block) <- stringr::str_replace_all(levels(data$Block), "[:digit:]", "")
+
 inhib_blocks <- c("Anti","Random")
 bind_blocks <- c("Pro","Anti","Colour")
-SaccadeFromCue <- c("Anti","Random","Central4")
-SaccadeFromFixation <- c("Pro","Anti","Random","Central4")
+SaccadeFromCue <- c("Anti","Random","Central")
+SaccadeFromFixation <- c("Pro","Anti","Random","Central")
 
 Block2Conds <- data.frame(
   Block = unique(data$Block)
@@ -84,6 +86,19 @@ This study was designed to isolate different processes contributing to performan
 
 ```{r figCond, echo=FALSE, fig.align='center', out.width="80%", fig.cap = paste("(ref:desc_cond)", "(ref:trial-type)")}
 knitr::include_graphics(path = "Conditions_Exp5.png")
+```
+
+In addition, we also included requirements to perform saccade away from Fixation or from the Cue to detect the target letter. The idea behind this was to include costs that occur because attention is partly guided by the transient onset signal of the cue. We aimed to separate these more exogenous processes of guiding attention, from the endogenous processes that are supposedly reling on attention control. An overview, of which processes were required in the different experimental blocks is shown in @tbl:Blocks2Procs
+
+```{r Blocks2Procs}
+Table_Blocks2Procs <- Block2Conds %>% 
+  mutate(SensoryDisc = 1) %>% 
+  select(Block, SensoryDisc, inhibition, binding, SaccadeFromFixation, SaccadeFromCue)
+
+Table_Blocks2Procs[,2:6] <- ifelse(Table_Blocks2Procs[,2:6] == 1, "yes","no")
+Table_Blocks2Procs <- Table_Blocks2Procs[c(2,3,1,4,5),]
+colnames(Table_Blocks2Procs) <- c("Block", "Sensory Disc.", "Inhibition", "Binding", "Saccade from Fixation", "Saccade from Cue")
+knitr::kable(Table_Blocks2Procs)
 ```
 
 The idea underlying these different blocks is to systematically vary if participants need to inhibit automatic saccades towards the cue, and if the location the cue appears in is informative with respect to the target location. Thus, as already discussed in the introduction they require different processes that might be related to performance in the manual anti-saccade task. In detail, the No-Saccade block only requires to quickly discriminate between the target letters without any demands on controlling saccades and moving the eyes. The Pro-Saccade block adds the demands of performing a saccade to the cued locations. This could happen automatically or controlled. But it does not require to inhibit the automatic saccade. The Anti-Saccade block requires subjects to move their gaze to the opposite location of where the cue appeared. This requires inhibiting the automatic saccade elicited by the transient onset signal of the cue, and performing a controlled saccade to the opposite location. The Random saccade block require to inhibit the automatic saccade towards the cue, but does not allow for a controlled saccade towards the target location as it can not be inferred from the location the cue appeared in. Finally, the Central block neither requires to inhibit an automatic saccade, as the cue appears in the center, but also does not allow for a controlled saccade as the cue is not informative for the target location. But unlike in the No-Saccade condition the target does appear in one of the peripheral locations, thus only the transient onset signal of the target will draw attention towards the target location.
@@ -360,22 +375,13 @@ fit_E5_theoretical_reduced_prior <- brms::brm(theoretical_model_reduced,
 bf_pars <- bayestestR::bayesfactor_parameters(fit_E5_theoretical_full,
                                                prior = fit_E5_theoretical_full_prior)
 
-# compute Bayes Factor for setting filter to zero
-if (!file.exists("bridge_marginalLL_Exp5.rds")) {
-  bridge_full <- bridge_sampler(fit_E5_theoretical_full, cores = 4, repetitions = 10)
-  bridge_reduced <- bridge_sampler(fit_E5_theoretical_reduced, cores = 4, repetitions = 10)
-  
-  marginalLL <- list(full = bridge_full,
-                     reduced = bridge_reduced)
-  saveRDS(marginalLL, "bridge_marginalLL_Exp5.rds")
-} else {
-  marginalLL <- readRDS("bridge_marginalLL_Exp5.rds")
-}
+bridge_full <- bridge_sampler(fit_E5_theoretical_full, repetitions = 10)
+bridge_reduced <- bridge_sampler(fit_E5_theoretical_reduced, repetitions = 10)
 
-bf_filter <- bayes_factor(marginalLL$full, marginalLL$reduced)
+bf_filter <- bayes_factor(bridge_full, bridge_reduced)
 
 # extract fixed effect for theoretical model
-fixFX <- round(fixef(fit_E5_theoretical_full),2)
+fixFX <- fixef(fit_E5_theoretical_full_prior)
 
 newdata <- expand.grid(
   ID = unique(agg_data$ID),
@@ -453,27 +459,25 @@ ggsave(filename = "PostPredictives_Theoretical_E5.jpg",pp_plot_theoretical, dpi 
 gc()
 ```
 
-(ref:post-pred) Posterior predictive statistics of the average proportion correct as a function of CTI duration in the three experimental blocks. The black crosses indicate the observed average proportion correct based on the data.
+(ref:post-pred) Posterior predictive statistics of the average proportion correct as a function of CTI duration in the three experimental blocks.
 
 ```{r Fig_PostPred, echo=FALSE, fig.align='center', out.width="80%", fig.cap = paste("(ref:post-pred)")}
 pp_plot_theoretical
 ```
 
-Figure \@ref(fig:Fig_PostPred) shows the posterior predictive estimates from the Bayesian GLM for the different experimental blocks and the changes in performance across the different CTI levels on the proportion correct scale. The theoretical model fits adequately to the observed data, as indicated by the black crosses in the plot.
+Figure \@ref(fig:Fig_PostPred) shows the posterior predictive estimates from the Bayesian GLM for the different experimental blocks and the changes in performance across the different CTI levels on the proportion correct scale. 
 
-First, we evaluated if there was evidence for the different theoretical assumed processes contributing to performance in the manual Anti-Saccade task. The results indicated that there was credible automatic activation of cues, $b_{CueAct} = `r fixFX["ActCue_Intercept","Estimate"]`, 95% CI = [`r fixFX["ActCue_Intercept","Q2.5"]`;`r fixFX["ActCue_Intercept","Q97.5"]`]$, $BF_{10} =$ `r printnum(exp(bf_pars[which(bf_pars[,"Parameter"] == "b_ActCue_Intercept"),"log_BF"]), format = "g")`, which weakened with longer CTI duration, $b_{filter} = `r round(exp(fixFX["filterSpeed_Intercept","Estimate"]),2)`, 95% CI = [`r exp(fixFX["filterSpeed_Intercept","Q2.5"])`;`r exp(fixFX["filterSpeed_Intercept","Q97.5"])`]$, $BF_{10} =$ `r printnum( bf_filter[["bf_median_based"]], format = "g")`. Likewise, an informative association of the cue to the location of the target location improved performance with longer CTI duration, $b_{binding} = `r fixFX["bindingAct_Intercept","Estimate"]`, 95% CI = [`r fixFX["bindingAct_Intercept","Q2.5"]`;`r fixFX["bindingAct_Intercept","Q97.5"]`]$, $BF_{10} =$ `r printnum(exp(bf_pars[which(bf_pars[,"Parameter"] == "b_bindingAct_Intercept"),"log_BF"]), format = "g")`. In addition, both having to perform a saccade away from fixation, $b_{CueAct} = `r fixFX["Baseline_SaccadeFromFixation","Estimate"]`, 95% CI = [`r fixFX["Baseline_SaccadeFromFixation","Q2.5"]`;`r fixFX["Baseline_SaccadeFromFixation","Q97.5"]`]$, $BF_{10} =$ `r printnum(exp(bf_pars[which(bf_pars[,"Parameter"] == "b_Baseline_SaccadeFromFixation"),"log_BF"]), format = "g")`, and a saccade away from the cue, $b_{CueAct} = `r fixFX["Baseline_SaccadeFromCue","Estimate"]`, 95% CI = [`r fixFX["Baseline_SaccadeFromCue","Q2.5"]`;`r fixFX["Baseline_SaccadeFromCue","Q97.5"]`]$, $BF_{10} =$ `r printnum(exp(bf_pars[which(bf_pars[,"Parameter"] == "b_Baseline_SaccadeFromCue"),"log_BF"]), format = "g")`, resulted in worse performance. A summary of parameter estimates is displayed in Table \@ref(tab:ParTable).
+First, we evaluated if there was evidence for the different theoretical assumed processes contributing to performance in the manual Anti-Saccade task. The results indicated that there was credible automatic activation of cues, $b_{CueAct} = `r `$, $BF_{10} = `r printnum(exp(bf_pars1$log_BF[which(bf_pars1$Parameter == "b_ActCue_Intercept")]), format = "g")`$, which weakened with longer CTI duration, $BF_{10} = `r printnum(exp(bf_pars1$log_BF[which(bf_pars1$Parameter == "b_filterSpeed_Intercept")]), format = "g")`$. Likewise, an informative association of the cue to the location of the target location improved performance with longer CTI duration, $BF_{10} = `r printnum(exp(bf_pars1$log_BF[which(bf_pars1$Parameter == "b_bindingAct_Intercept")]), format = "g")`$. In addition, both having to perform a saccade away from fixation, $BF_{10} = `r printnum(exp(bf_pars1$log_BF[which(bf_pars1$Parameter == "b_Baseline_SaccadeFromFixation")]), format = "g")`$, and a saccade away from the cue, $BF_{10} = `r printnum(exp(bf_pars1$log_BF[which(bf_pars1$Parameter == "b_Baseline_SaccadeFromCue")]), format = "g")`$, resulted in worse performance. A summary of parameter estimates is displayed in Table \@ref(tab:ParTable).
 
 ```{r ParTable, echo = F}
-randFX <- ranef(fit_E5_theoretical_full)$ID
+fixFX <- fixef(fit_E5_theoretical1)
+randFX <- ranef(fit_E5_theoretical1)$ID
 rownames(fixFX) <- stringr::str_remove(rownames(fixFX), "_Intercept")
-fixFX["filterSpeed",]<- exp(fixFX["filterSpeed",])
 apa_table(fixFX[,c("Estimate","Q2.5","Q97.5")])
 ```
 
-We also estimated the correlations between all random effects. Table \@ref(tab:CorrTable) shows the estimated standard deviations of all random effects and the correlations among them. Generally, correlations between random effects were small, most $|r_s| < .30$, except for the correlation between the Intercept of Baseline performance and the cost of performing a saccade away from the fixation, $r = -.59$, indicating that people that were good at discriminating the target letters overall exhibited larger cost for performing a saccade away from fixation.  However, the generally small correlations indicate that our theoretical model is able to isolate different cognitive processes underlying performance in the manual Anti-Saccade tasks.
-
-```{r CorrTable, echo=FALSE}
-corr_est <- VarCorr(fit_E5_theoretical_full)$ID
+```{r echo=FALSE}
+corr_est <- VarCorr(fit_E5_theoretical1)$ID
 
 cormat <- matrix(NA, nrow = nrow(fixFX), ncol = nrow(fixFX))
 

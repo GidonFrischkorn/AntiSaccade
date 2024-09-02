@@ -3,5 +3,6 @@
 export("%>%")
 export(aggregate_data)
 export(clean_plot)
+export(ez.dm)
 export(plot_descriptives)
 importFrom(magrittr,"%>%")

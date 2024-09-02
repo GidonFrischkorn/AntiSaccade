@@ -1,0 +1,5 @@
+t0 =~ t0_HT + t0_NJ + t0_CJ
+
+t0_HT ~ 0
+t0_NJ ~ 0
+t0_CJ ~ 0

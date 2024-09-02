@@ -327,15 +327,6 @@ pp_plot_theoretical <- ggplot(data = tidy_pred_theoretical,
        title = "Posterior Predictives (Theoretical)") +
   coord_cartesian(ylim = c(0,1))
 ggsave(filename = "PostPredictives_theoretical_E9.jpg",pp_plot_theoretical, dpi = 300, width = 7, height = 6)
-
-# pp_check(fit_E9_saturated, ndraws = 10, type = "dens_overlay_grouped", group = "Block")
-# pp_check(fit_E9_theoretical2, ndraws = 10, type = "dens_overlay_grouped", group = "SaccadeFromCue")
-# pp_check(fit_E9_theoretical2, ndraws = 10, type = "dens_overlay_grouped", group = "binding")
-# pp_check(fit_E9_theoretical2, ndraws = 10, type = "dens_overlay_grouped", group = "inhibition")
-
-# bridge_fit <- bridge_sampler(fit_binomial, cores = 4, repetition = 20)
-# bridge_fit2 <- bridge_sampler(fit_binomial, cores = 4, repetition = 20)
-# bayes_factor(bridge_fit, bridge_fit2)
 ```
 
 
@@ -420,8 +411,6 @@ WMC_scores <- data.frame(lavPredict(fit_MM_WMC))
 WMC_scores$ID <- aggData_WMC$ID
 
 randFX <- ranef(fit_E9_theoretical2)$ID
-
-
 
 subjectFX <- data.frame(
   ID = as.integer(rownames(randFX[,,"Baseline_Intercept"])),
