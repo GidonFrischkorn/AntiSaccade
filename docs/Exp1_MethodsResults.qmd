@@ -755,8 +755,8 @@ df_cor <- df_validity %>%
     ActCue = cor(pC, ActCue_Intercept, use = "complete.obs"),
     Filter = cor(pC, filterSpeed_Intercept, use = "complete.obs"),
     Binding = cor(pC, bindingAct_Intercept, use = "complete.obs"),
-    SaccCue = cor(pC, Baseline_SaccadeFromCue, use = "complete.obs"),
-    SaccFix = cor(pC, Baseline_SaccadeFromFixation, use = "complete.obs"),
+    SaccCue = cor(pC, Baseline_SaccadeFromCue1, use = "complete.obs"),
+    SaccFix = cor(pC, Baseline_SaccadeFromFixation1, use = "complete.obs"),
   .groups = "drop") %>% 
   tidyr::pivot_longer(cols = c(SensDisc, ActCue, Filter, Binding, SaccCue, SaccFix)) %>% 
   group_by(Block, CTI, name) %>% 
