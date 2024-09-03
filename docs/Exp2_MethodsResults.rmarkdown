@@ -19,7 +19,7 @@ knitr::opts_chunk$set(
 ```
 
 ```{r setup}
-pacman::p_load(AntiSaccade, papaja, brms, dplyr, ggplot2, here, lavaan)
+pacman::p_load(AntiSaccade, papaja, brms, dplyr, ggplot2, here, lavaan, tidybayes)
 options(mc.cores = parallel::detectCores())
 
 multivariate_outlier_delete = "no"
@@ -47,6 +47,7 @@ inhib_blocks <- c("Anti","Random")
 bind_blocks <- c("Pro","Anti","Colour")
 SaccadeFromCue <- c("Anti","Random","Central","Colour")
 SaccadeFromFixation <- c("Pro","Anti","Random","Central","Colour")
+bind_arbitraty <- c("Colour")
 
 Block2Conds <- data.frame(
   Block = unique(data$Block)
@@ -54,14 +55,19 @@ Block2Conds <- data.frame(
 
 data$inhibition <- ifelse(data$Block %in% inhib_blocks,1,0)
 data$binding <- ifelse(data$Block %in% bind_blocks,1,0)
-data$SaccadeFromCue <- ifelse(data$Block %in% SaccadeFromCue,1,0)
-data$SaccadeFromFixation <- ifelse(data$Block %in% SaccadeFromFixation,1,0)
+data$SaccadeFromCue <- factor(ifelse(data$Block %in% SaccadeFromCue,"yes","no"), levels = c("yes","no"))
+data$SaccadeFromFixation <- factor(ifelse(data$Block %in% SaccadeFromFixation,"yes","no"), levels = c("yes","no"))
+data$bindArb <- factor(ifelse(data$binding == 0, "no",
+                              ifelse(data$Block %in% bind_arbitraty, "yes","no")),
+                       levels = c("yes","no"))
 
 Block2Conds$inhibition <- ifelse(Block2Conds$Block %in% inhib_blocks,1,0)
 Block2Conds$binding <- ifelse(Block2Conds$Block %in% bind_blocks,1,0)
-Block2Conds$SaccadeFromCue <- ifelse(Block2Conds$Block %in% SaccadeFromCue,1,0)
-Block2Conds$SaccadeFromFixation <- ifelse(Block2Conds$Block %in% SaccadeFromFixation,1,0)
-
+Block2Conds$SaccadeFromCue <- factor(ifelse(Block2Conds$Block %in% SaccadeFromCue,"yes","no"), levels = c("yes","no"))
+Block2Conds$SaccadeFromFixation <- factor(ifelse(Block2Conds$Block %in% SaccadeFromFixation,"yes","no"), levels = c("yes","no"))
+Block2Conds$bindArb <- factor(ifelse(Block2Conds$binding == 0, "no",
+                                     ifelse(Block2Conds$Block %in% bind_arbitraty, "yes","no")),
+                              levels = c("yes","no"))
 outlier_data <- data %>% 
   group_by(ID, Block, CTI) %>% 
   summarise(meanPC = mean(correct),
@@ -79,12 +85,16 @@ data <- data %>%
 nSub <- length(unique(data$ID))
 
 agg_data <- data %>%
-  dplyr::group_by(ID, Block, SaccadeFromCue, SaccadeFromFixation, inhibition, binding, CTI_num) %>%
+  dplyr::group_by(ID, Block, SaccadeFromCue, SaccadeFromFixation, inhibition, binding, bindArb, CTI_num) %>%
   dplyr::summarise(
     correct = sum(correct),
     nTrials = dplyr::n(),
     .groups = "drop"
   )
+
+contrasts(agg_data$SaccadeFromFixation) <- contr.treatment(2,base = 2)
+contrasts(agg_data$SaccadeFromCue) <- contr.treatment(2,base = 1)
+contrasts(agg_data$bindArb) <- bayestestR::contr.equalprior
 ```
 
 
@@ -157,7 +167,7 @@ aggData_WMC <- data_WMC %>%
             nRet = n())
 
 plotDesc_WMC <- ggplot(aggData_WMC,
-       aes(y = meanPC, x = task, color = task)) +
+                       aes(y = meanPC, x = task, color = task)) +
   stat_summary() +
   geom_jitter(alpha = 0.2) +
   labs(y = "Proportion Correct", x = "Task")
@@ -301,7 +311,7 @@ aggData_PS <- data_PS_clean %>%
             t0 = ez.dm(RT = RT, ACC = accuracy, robust = TRUE)[3]) 
 
 plotDrift_PS <- ggplot(data = aggData_PS,
-                     aes(x = task, y = v, color = task)) +
+                       aes(x = task, y = v, color = task)) +
   stat_summary(position = position_dodge(plot_dodge)) +
   geom_jitter(alpha = 0.2, position = ggplot2::position_jitterdodge(jitter.width = 0.25, dodge.width = plot_dodge)) +
   labs(y = "Drift Rate", x = "Task", color = "Task")
@@ -449,7 +459,7 @@ model_th_full <- bf(correct | trials(nTrials) ~ Baseline -
                       (1 + SaccadeFromCue + SaccadeFromFixation  |r| ID),
                     ActCue ~ 1 + (1 |r| ID),
                     filterSpeed ~ 1 + (1 |r| ID),
-                    bindingAct ~ 1 + inhibition + (1 + inhibition |r| ID),
+                    bindingAct ~ 1 + bindArb + (1 + bindArb |r| ID),
                     nl = TRUE
 )
 
@@ -461,7 +471,7 @@ model_th_PS <- bf(correct | trials(nTrials) ~ Baseline -
                     (1 + SaccadeFromCue + SaccadeFromFixation  |r| ID),
                   ActCue ~ 1 + v + (1 |r| ID),
                   filterSpeed ~ 1 + v + (1 |r| ID),
-                  bindingAct ~ 1 + v + inhibition + (1 + inhibition |r| ID),
+                  bindingAct ~ 1 + v + bindArb + (1 + bindArb |r| ID),
                   nl = TRUE
 )
 
@@ -473,7 +483,7 @@ model_th_WMC <- bf(correct | trials(nTrials) ~ Baseline -
                      (1 + SaccadeFromCue + SaccadeFromFixation  |r| ID),
                    ActCue ~ 1 + WMC_g + (1 |r| ID),
                    filterSpeed ~ 1 + WMC_g + (1 |r| ID),
-                   bindingAct ~ 1 + WMC_g + inhibition + (1 + inhibition |r| ID),
+                   bindingAct ~ 1 + WMC_g + bindArb + (1 + bindArb |r| ID),
                    nl = TRUE
 )
 ```
@@ -513,7 +523,7 @@ agg_data <- agg_data %>% left_join(COV_scores)
 ```
 
 
-For all model parameters, we used moderately informative logistic priors centered on zero with a scale of 1/2. Parameters were estimated with four independent MCMC chains retaining 10000 samples for each chain after 2000 warm-up samples.
+For all model parameters, we used moderately informative normal priors centered on zero with a standard deviation of one. Parameters were estimated with four independent MCMC chains retaining 10000 samples for each chain after 2000 warm-up samples.
 
 
 ```{r Priors}
@@ -554,9 +564,7 @@ table_data <- agg_data %>%
 
 names(table_data)[which(names(table_data) == "CTI_num")] <- "CTI"
 
-apa_table(table_data,
-          caption = "Desciptive statistiscs for the proportion correct in all experimental conditions.",
-          landscape = TRUE)
+knitr::kable(table_data,digits = 2)
 ```
 
 
@@ -564,11 +572,6 @@ The summary statistics for the Proportion of correct responses in the five diffe
 
 
 ```{r FigDesc, echo=FALSE}
-lin_mod <- bf(correct | trials(nTrials) ~ 
-                1 + SaccadeFromCue + inhibition*CTI + binding*CTI +
-                (1 + SaccadeFromCue + inhibition*CTI + binding*CTI | ID))
-agg_data3 <- aggregate_data(lin_mod, data, family = binomial())
-
 desc_plot <- ggplot(data = agg_data,
                     aes(x = as.factor(CTI_num), y = correct/nTrials, color = as.factor(Block), fill = as.factor(Block), 
                         group = as.factor(Block), shape = as.factor(SaccadeFromCue))) +
@@ -590,7 +593,7 @@ ggsave(filename = "E9_Descriptives.jpg",desc_plot, dpi = 300, width = 7, height 
 
 ![Average performance in the different experimental blocks for different CTI durations.](E9_Descriptives.jpg){#fig-descriptive}
 
-@fig-descriptivesCov shows the performance in the working memory capacity and processing speed tasks. 
+@fig-descriptivesCov shows the performance in the working memory capacity and processing speed tasks.
 
 
 ```{r}
@@ -603,8 +606,6 @@ ggsave(filename = "E9_Descriptives.jpg",desc_plot, dpi = 300, width = 7, height 
 plotDesc_WMC
 plotDrift_PS
 ```
-
-
 
 
 ## GLM: Accuracy
@@ -633,7 +634,7 @@ fit_E9_th_full <- brms::brm(model_th_full,
                             save_pars = save_pars(all = T),
                             sample_prior = T,
                             file = "fit_Exp9_th_full",
-                            file_refit = "never")
+                            file_refit = "on_change")
 
 fit_E9_th_PS <- brms::brm(model_th_PS,
                           data = agg_data,
@@ -721,13 +722,14 @@ newdata2 <- expand.grid(
   binding = unique(agg_data$binding),
   inhibition = unique(agg_data$inhibition),
   SaccadeFromCue = unique(agg_data$SaccadeFromCue),
-  SaccadeFromFixation = unique(agg_data$SaccadeFromFixation)
+  SaccadeFromFixation = unique(agg_data$SaccadeFromFixation),
+  bindArb = unique(agg_data$bindArb)
 ) %>% 
   left_join(Block2Conds) %>% 
   filter(!is.na(Block))
 
 tidy_pred_saturated <- fit_E9_sat %>% 
-  tidybayes::epred_draws(newdata = newdata) %>% 
+  tidybayes::epred_draws(newdata = newdata, ndraws = 1000) %>% 
   group_by(ID, CTI_num, Block) %>% 
   summarise(predValue = mean(.epred)) %>% 
   left_join(Block2Conds) 
@@ -754,8 +756,8 @@ pp_plot_saturated <- ggplot(data = tidy_pred_saturated,
 ggsave(filename = "PostPredictives_Saturated_E9.jpg",pp_plot_saturated, dpi = 300, width = 7, height = 6)
 
 tidy_pred_theoretical <- fit_E9_th_full %>% 
-  tidybayes::epred_draws(newdata = newdata2) %>% 
-  group_by(ID, CTI_num, binding, inhibition, SaccadeFromCue, SaccadeFromFixation) %>% 
+  tidybayes::epred_draws(newdata = newdata2, ndraws = 1000) %>% 
+  group_by(ID, CTI_num, binding, bindArb, inhibition, SaccadeFromCue, SaccadeFromFixation) %>% 
   summarise(predValue = mean(.epred)) %>% 
   left_join(Block2Conds) %>% 
   filter(!is.na(Block))
@@ -797,7 +799,7 @@ As in Experiment 1, we tested if there is evidence for the different theoretical
 fixFX <- fixef(fit_E9_th_full)
 rownames(fixFX) <- stringr::str_remove(rownames(fixFX), "_Intercept")
 fixFX["filterSpeed",]<- exp(fixFX["filterSpeed",])
-apa_table(fixFX[,c("Estimate","Q2.5","Q97.5")])
+knitr::kable(fixFX[,c("Estimate","Q2.5","Q97.5")], digits = 2)
 ```
 
 
@@ -809,22 +811,24 @@ As a preliminary estimate for relationships between WMC and processing speed wit
 ```{r}
 #| label: tbl-covcorr
 #| tab-cap: "Overview of parameter estimates"
+
 randFX <- ranef(fit_E9_th_full)$ID
 
 df_randFX <- data.frame(
   ID = as.numeric(row.names(randFX[,,"Baseline_Intercept"])),
   Baseline = randFX[,"Estimate","Baseline_Intercept"],
-  SfF = randFX[,"Estimate","Baseline_SaccadeFromFixation"],
-  SfC = randFX[,"Estimate","Baseline_SaccadeFromCue"],
+  SfF = randFX[,"Estimate","Baseline_SaccadeFromFixation1"],
+  SfC = randFX[,"Estimate","Baseline_SaccadeFromCue1"],
   Ac = randFX[,"Estimate","ActCue_Intercept"],
   f = randFX[,"Estimate","filterSpeed_Intercept"],
-  Bind = randFX[,"Estimate","bindingAct_Intercept"]
+  Bind = randFX[,"Estimate","bindingAct_Intercept"],
+  Bind_arb = randFX[,"Estimate","bindingAct_bindArb1"]
 )
 
 df_randFX <- df_randFX %>% left_join(COV_scores)
-covmat_pred <- round(cor(df_randFX[,c(2:8,11)], use = "complete.obs"),2)
+covmat_pred <- round(cor(df_randFX[,c(2:12)], use = "complete.obs"),2)
 covmat_pred[upper.tri(covmat_pred)] <- ""
-knitr::kable(covmat_pred)
+knitr::kable(covmat_pred, digits = 2)
 ```
 
 ```{r BayesFactors}
@@ -871,7 +875,7 @@ For processing speed, posterior credibility intervals indicated a positive relat
 #| tab-cap: "Parameters estimates for the relationship of processing speed (drift rate v) and processes in the manual anti-saccade task"
 fixFX_PS <- fixef(fit_E9_th_PS)
 PS_cols <- grepl("_v",rownames(fixFX_PS))
-knitr::kable(round(fixFX_PS[WMC_cols,c("Estimate","Q2.5","Q97.5")],2))
+knitr::kable(fixFX_PS[WMC_cols,c("Estimate","Q2.5","Q97.5")], digits = 2)
 ```
 
 ```{r}
@@ -888,5 +892,55 @@ conditional_effects(fit_E9_th_PS, nlpar = "Baseline", effect = "v")
 conditional_effects(fit_E9_th_PS, nlpar = "ActCue", effect = "v")
 conditional_effects(fit_E9_th_PS, nlpar = "filterSpeed", effect = "v")
 conditional_effects(fit_E9_th_PS, nlpar = "bindingAct", effect = "v")
+```
+
+```{r}
+agg_data_validity <- agg_data %>% 
+  mutate(pC = correct/nTrials) %>% 
+  select(ID,Block,CTI_num,pC)
+
+randFX_draws <- fit_E9_th_full %>% 
+  tidybayes::gather_draws(r_ID__Baseline[ID,term],
+                          r_ID__bindingAct[ID,term],
+                          r_ID__ActCue[ID,],
+                          r_ID__filterSpeed[ID,], ndraws = 100) %>% 
+  mutate(.variable = stringr::str_remove(.variable, "r_ID__"))
+randFX_draws$term[is.na(randFX_draws$term)] <- "Intercept"
+
+randFX_draws <- randFX_draws %>% 
+  tidyr::pivot_wider(names_from = c(.variable,term),
+              values_from = .value)
+
+df_validity = expand.grid(
+  ID = unique(agg_data$ID),
+  Block = unique(agg_data$Block),
+  CTI_num = unique(agg_data$CTI_num),
+  .chain = unique(randFX_draws$.chain),
+  .iteration = unique(randFX_draws$.iteration),
+  .draw = unique(randFX_draws$.draw)
+) %>% left_join(agg_data_validity, by = c("ID","Block","CTI_num")) %>% 
+  left_join(randFX_draws, by = c("ID",".chain",".draw",".iteration"))
+
+df_cor <- df_validity %>% 
+  group_by(Block, CTI_num, .draw) %>% 
+  summarise(
+    SensDisc = cor(pC, Baseline_Intercept, use = "complete.obs"),
+    ActCue = cor(pC, ActCue_Intercept, use = "complete.obs"),
+    Filter = cor(pC, filterSpeed_Intercept, use = "complete.obs"),
+    Binding = cor(pC, bindingAct_Intercept, use = "complete.obs"),
+    SaccCue = cor(pC, Baseline_SaccadeFromCue1, use = "complete.obs"),
+    SaccFix = cor(pC, Baseline_SaccadeFromFixation1, use = "complete.obs"),
+  .groups = "drop") %>% 
+  tidyr::pivot_longer(cols = c(SensDisc, ActCue, Filter, Binding, SaccCue, SaccFix)) %>% 
+  group_by(Block, CTI_num, name) %>% 
+  summarise(
+    mean = mean(value),
+    CIlow = quantile(value, probs = 0.025),
+    CIhigh = quantile(value, probs = 0.975)
+  ) %>% 
+  tidyr::pivot_wider(names_from = name,
+                     values_from = c(mean, CIlow, CIhigh))
+
+knitr::kable(df_cor, digits = 2)
 ```
 
