@@ -7,7 +7,7 @@
 ez.dm(RT, ACC, s = 1, robust = TRUE, use_RTs = "correct")
 }
 \arguments{
-\item{RT}{numeric. A vector of reaction times  A \code{formula} or \code{brmsformula} object that is specifies the model to be analyzed.}
+\item{RT}{numeric. A vector of reaction times.}
 
 \item{ACC}{numeric. A vector of accuracies to determine the proportion correct.}
 
@@ -15,7 +15,7 @@ ez.dm(RT, ACC, s = 1, robust = TRUE, use_RTs = "correct")
 
 \item{robust}{logical. Should robust statistics, that is median and Interquartile range, be used to calculate the ezDM parameters. Default is true.}
 
-\item{use_RTs}{character. Should only be correct RTs ("correct") or all RTs (any other character) be used to calculate mean and sd of RTs.}
+\item{use_RTs}{character. Should only correct RTs ("correct") or all RTs (any other character) be used to calculate mean and sd of RTs.}
 }
 \description{
 This functions calculates the ezDM parameters as proposed by Wagenmakers et al. (2007).

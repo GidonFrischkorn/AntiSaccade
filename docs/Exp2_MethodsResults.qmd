@@ -22,8 +22,6 @@ knitr::opts_chunk$set(
 pacman::p_load(AntiSaccade, papaja, brms, dplyr, ggplot2, here, lavaan, tidybayes)
 options(mc.cores = parallel::detectCores())
 
-multivariate_outlier_delete = "no"
-
 # plot settings
 plot_dodge <- 1
 jitter_width <- 1
@@ -32,37 +30,39 @@ point_alpha <- 0.1
 
 # Methods
 
-In this study, we again isolated different processes contributing to performance in the manual anti saccade task. Additionally, we measured individual differences in processing speed (PS) and working memory capacity (WMC) to investigate which of the processes contributing to performance in the anti-saccade task was related to PS and WMC.
+In this study, we again isolated different processes contributing to performance in the manual anti saccade task. We added another condition to more directly isolate procedural binding strength and additionally, we measured individual differences in working memory capacity (WMC) and processing speed (PS) to investigate which of the processes required in the manual anti-saccade task was related to PS and WMC.
 
 ```{r load_data, include=FALSE}
 data <- RawData_Exp9  %>% filter(CTI != 200)
 nSub_total <- length(unique(data$ID))
 data$CTI_num <- (data$CTI)/100
 data$CTI <- as.factor(data$CTI)
+data$FixDur_num <- (data$FixDur - mean(unique(data$FixDur)))/1000
+
 data$RTms <- data$RTms + 150
 
 inhib_blocks <- c("Anti","Random")
 bind_blocks <- c("Pro","Anti","Colour")
-SaccadeFromCue <- c("Anti","Random","Central","Colour")
-SaccadeFromFixation <- c("Pro","Anti","Random","Central","Colour")
+bottomup_blocks <- c("No","Pro")
+saccade_blocks <- c("Pro","Anti","Random","Central")
 bind_arbitraty <- c("Colour")
 
 Block2Conds <- data.frame(
   Block = unique(data$Block)
 )
 
-data$inhibition <- ifelse(data$Block %in% inhib_blocks,1,0)
-data$binding <- ifelse(data$Block %in% bind_blocks,1,0)
-data$SaccadeFromCue <- ifelse(data$Block %in% SaccadeFromCue,0,1)
-data$SaccadeFromFixation <- ifelse(data$Block %in% SaccadeFromFixation,1,0)
+data$inhibition <- ifelse(data$Block %in% inhib_blocks, 1, 0)
+data$binding <- ifelse(data$Block %in% bind_blocks, 1, 0)
+data$bottomup <- ifelse(data$Block %in% bottomup_blocks, 1, 0)
+data$saccade <- ifelse(data$Block %in% saccade_blocks, 1, 0)
 data$bindArb <- factor(ifelse(data$binding == 0, "no",
                               ifelse(data$Block %in% bind_arbitraty, "yes","no")),
                        levels = c("yes","no"))
 
-Block2Conds$inhibition <- ifelse(Block2Conds$Block %in% inhib_blocks,1,0)
-Block2Conds$binding <- ifelse(Block2Conds$Block %in% bind_blocks,1,0)
-Block2Conds$SaccadeFromCue <- ifelse(data$Block %in% SaccadeFromCue,0,1)
-Block2Conds$SaccadeFromFixation <- ifelse(data$Block %in% SaccadeFromFixation,1,0)
+Block2Conds$inhibition <- ifelse(Block2Conds$Block %in% inhib_blocks,1, 0)
+Block2Conds$binding <- ifelse(Block2Conds$Block %in% bind_blocks, 1, 0)
+Block2Conds$bottomup <- ifelse(Block2Conds$Block %in% bottomup_blocks, 1, 0)
+Block2Conds$saccade <- ifelse(Block2Conds$Block %in% saccade_blocks, 1, 0)
 Block2Conds$bindArb <- factor(ifelse(Block2Conds$binding == 0, "no",
                                      ifelse(Block2Conds$Block %in% bind_arbitraty, "yes","no")),
                               levels = c("yes","no"))
@@ -75,7 +75,7 @@ outlier_data <- data %>%
   mutate(
     meanPC_logit = logit_scaled(meanPC - (0.5/nTrials)),
     zPC_logit = (meanPC_logit - mean(meanPC_logit))/sd(meanPC_logit))
-outlier_IDs2 <- unique(outlier_data$ID[which(outlier_data$meanPC <= qbinom(p = .95, size = outlier_data$nTrials, prob = 1/3)/outlier_data$nTrials)])
+outlier_IDs2 <- unique(outlier_data$ID[which(outlier_data$meanPC <= qbinom(p = .99, size = outlier_data$nTrials, prob = 1/3)/outlier_data$nTrials)])
 outlier_IDs <- unique(outlier_data$ID[which(outlier_data$zPC_logit <= qnorm(p = .01))])
 
 data <- data %>% 
@@ -83,7 +83,7 @@ data <- data %>%
 nSub <- length(unique(data$ID))
 
 agg_data <- data %>%
-  dplyr::group_by(ID, Block, SaccadeFromCue, SaccadeFromFixation, inhibition, binding, bindArb, CTI_num) %>%
+  dplyr::group_by(ID, Block, bottomup, saccade, inhibition, binding, bindArb, FixDur, FixDur_num, CTI, CTI_num) %>%
   dplyr::summarise(
     correct = sum(correct),
     nTrials = dplyr::n(),
@@ -97,30 +97,36 @@ contrasts(agg_data$bindArb) <- bayestestR::contr.equalprior
 
 We recruited `r papaja::printnum(nSub_total)` participants via Prolific, `r papaja::printnum(nSub_total - nSub)` participants were excluded for low performance, thus `r papaja::printnum(nSub)` participants were included in the data analyses. Participants were required to be 18 to 40 years old, speak English as their first language, and have an approval rate of at least 85% when participating in studies on Prolific.
 
-## Saccade Task
+## Tasks
 
-In addition, to the five experimental blocks implemented in the previous experiment, we included a Color Saccade block in this experiment. In the Color Saccade block the cue appeared in the center of the screen and had one of four potential colors: red, blue, green, or yellow. Each color was associated with one of the four peripheral locations the target could appear in (red = on the right from the center, blue = below the center, green = above the center, and yellow = left of the center). Thus, this block did not require to inhibit an automatic saccade as the cue appeared in the center of the screen, but the cue color was associated with the location the target would appear in. To facilitate the recognition of the cue color, we changed the cue stimulus from "=" to a color patch. In the Color Saccade block the circle was color was either red, blue, green, or yellow. In all other blocks the circle was black. An overview of the processes required in the six experimental blocks in the saccade experiment is shown in @tbl-Block2Proc
+All tasks were again programmed in lab.js (Henninger et al., 2020) and run via JATOS. The tasks were run locally on the participants machines, but we required that the a laptop or desktop computer was used.[^1] Participation using a tablet or smartphone was not allowed. All tasks were run in a single session that lasted approximately 90 to 100 minutes. In between tasks participants were allowed to take breaks. For all participants the session started with the manual saccade task, followed by switching between one of the  working memory task and processing task until all tasks were completed.
+
+[^1]: In the supplementary experiment 7 (S7), we investigated if experimental manipulations in the manual anti-saccade task are comparable when performing it on a laptop and desktop computer. The results indicated that there were no differences in the experimental effects. Our goal with this study was to investigate to what extend differences in the devices used could impact the experimental effects as well as individual differences in the manual anti-saccade task.
+
+### Saccade Task
+
+In addition, to the five experimental blocks implemented in the previous experiment, we included a Color Saccade block in this experiment. In the Color Saccade block the cue appeared in the center of the screen and had one of four potential colors: red, blue, green, or yellow. Each color was associated with one of the four peripheral locations the target could appear in (red = on the right from the center, blue = below the center, green = above the center, and yellow = left of the center). Thus, this block did not require to inhibit an automatic saccade as the cue appeared in the center of the screen, but the cue color was associated with the location the target would appear in. To facilitate the recognition of the cue color, we changed the cue stimulus from an equal sifn ("=") to a color patch. In the Color Saccade block the color path was either red, blue, green, or yellow. In all other blocks the color patch was black. An overview of the processes required in the six experimental blocks in the saccade experiment is shown in @tbl-Block2Proc
 
 ```{r Blocks2Procs}
 #| label: tbl-Block2Proc
 #| tab-cap: "Processes required by the different experimental blocks."
 Table_Blocks2Procs <- Block2Conds %>% 
-  mutate(SensoryDisc = 1) %>% 
-  select(Block, SensoryDisc, inhibition, binding, SaccadeFromFixation, SaccadeFromCue)
+  mutate(PercSpeed = 1) %>% 
+  select(Block, PercSpeed, inhibition, binding, saccade, bottomup)
 
 Table_Blocks2Procs[,2:6] <- ifelse(Table_Blocks2Procs[,2:6] == 1, "yes","no")
 Table_Blocks2Procs <- Table_Blocks2Procs[c(3,2,5,1,6,4),]
-colnames(Table_Blocks2Procs) <- c("Block", "Sensory Disc.", "Inhibition", "Binding", "Saccade from Fixation", "Saccade from Cue")
+colnames(Table_Blocks2Procs) <- c("Block", "Perceptual Speed", "Inhibition", "Binding", "Saccade", "Bottom Up")
 knitr::kable(Table_Blocks2Procs)
 ```
 
-We again varied the Cue-Traget Innterval, but only in two levels[^1]: 50 and 400ms to evaluate if longer time to inhibit automatic saccades towards the cued-location when required and use the location of the cue to perform a controlled saccade when possible improves performance. Otherwise, the trial procedure was identical to the first experiment, except that the fixation duration was varied from 200ms to 1800ms in steps of 400ms. Accordingly, in each block we ran 120 trials, so that each of the three target letters, appeared once in each of the four peripheral locations with each of the five fixation durations and two CTIs. For each trial, we again recorded the response given as well as the response time as the time between onset of the target stimulus until the response.
+We again varied the Cue-Traget Innterval, but only in two levels[^2]: 50 and 400ms to evaluate if longer time to inhibit automatic saccades towards the cued-location and useing the location or color of the cue to perform a controlled saccade improves performance. Otherwise, the trial procedure was identical to the first experiment, except that the fixation duration was varied from 200ms to 1800ms in steps of 400ms. Accordingly, in each block we ran 120 trials, so that each of the three target letters, appeared once in each of the four peripheral locations with each of the five fixation durations and two CTIs. For each trial, we again recorded the response given as well as the response time as the time between onset of the target stimulus until the response.
 
-[^1]: We dropped one CTI condition to reduce testing time.
+[^2]: We dropped one CTI condition to reduce testing time.
 
-We also noticed, that in the first experiment performance was better (Average PC = 80% in Anti-Saccade and 95% in Pro-Saccade trials at the shortest CTI) than in previous studies using the manual Anti-Saccade task (Average PC = 50% in Anti-Saccade and 95% in Pro-Saccade trials). Therefore, we adapted the font size of the stimuli to more closely match the average performance in previous studies. For this we ran two additional experiments S5 and S6 that are reported in the online supplementary material. Finally, we also evaluated in differences in Screen sizes might contribute to individual differences in the experimental effects and compared if completing the task on a laptop with a small screen compared to a lab computer with a large screen changed the size of effects in the different experimental blocks. This was not the case as can be seen from the results of experiment S7 reported in the supplementary material.
+We also noticed, that in the first experiment performance was better (Average PC around 80% in Anti-Saccade and 95% in Pro-Saccade trials at the shortest CTI) than in previous studies using the manual Anti-Saccade task (Average PC around 50% in Anti-Saccade and 95% in Pro-Saccade trials). Therefore, we adapted the font size of the stimuli to more closely match the average performance in previous studies. For this we ran two additional supplementary experiments S5 and S6 that are reported in the online supplementary material. Finally, we also evaluated if differences in Screen sizes might contribute to individual differences in the experimental effects and compared if completing the task on a laptop with a small screen compared to a lab computer with a large screen changed the size of effects in the different experimental blocks. This was not the case as can be seen from the results of experiment S7 reported in the supplementary material.
 
-## Working Memory Tasks
+### Working Memory Tasks
 
 ```{r Prep_WMCdata}
 data_WMC <- Exp9_WorkingMemory
@@ -173,41 +179,29 @@ aggData_WMC$nTaskMissing <- rowSums(is.na(aggData_WMC[,2:3]))
 
 aggData_WMC <- aggData_WMC %>% 
   filter(nTaskMissing < 1)
-
-if(multivariate_outlier_delete == "yes") {
-  #create new column in data frame to hold Mahalanobis distances
-  aggData_WMC$mahal1 <- mahalanobis(aggData_WMC[,2:3], colMeans(aggData_WMC[,2:3], na.rm = T), cov(aggData_WMC[,2:3], use = "complete.obs"))
-  
-  #create new column in data frame to hold p-value for each Mahalanobis distance
-  aggData_WMC$p1 <- pchisq(aggData_WMC$mahal1, df=1, lower.tail=FALSE)
-  
-  
-  aggData_WMC <- aggData_WMC %>% 
-    filter(p1 > .01)
-}
 ```
 
-### Color-Location Binding
+#### Color-Location Binding
 
-In this task, participants were asked to remember in which position in a 4x4 grid different colors were presented in. The number of to-be-remebered colors varied from 3 to 5. Each color was shown for 1 second with an inter-stimulus interval of 1 second until the next color was shown. After all colors were shown and a retention interval of 1 second, all items were tested sequentially in random order. For this, either a cue appeared in one of the locations and participants needed to select which out of 8 colors was presented in the cued-location or a color was shown below the 4x4 grid and participants had to select in which position the color was shown in. There were 6 trials in each set size with 3 using location and 3 colors as retrieval cues.
+In the color-location binding task, participants were asked to remember in which position in a 4x4 grid different color patches were presented in. The number of to-be-remembered color patches varied from 3 to 5. Each color was shown for 1 second with an inter-stimulus interval of 1 second until the next color was shown. After all colors were shown and a short retention interval of 1 second, all items were tested sequentially in random order. For this, either a cue appeared in one of the locations and participants needed to select which out of the 8 colors used in the task was presented in the cued-location or a color was shown below the 4x4 grid and participants had to select in which position the color was shown in. There were 6 trials in each set size with 3 using location and 3 colors as retrieval cues.
 
-Performance was measured by calculating the proportion correct in each trial and then aggregating it over all trials, irrespective of set size.
+Performance was measured by calculating the proportion correct in each trial and then aggregating it over all trials, irrespective of set size and retrieval type.
 
-### Number Updating
+#### Number Updating
 
-In this task, participants saw 3 to 5 digits in different locations of a 4x4 grid. They were instructed to remember these digits at the location they were presented in. After all digits have were presented there were 3 updating steps. In each updating step one a transformation (+/- 1 or 2) was shown in one of locations a digit was presented in. Participants were instructed to perform this transformation and remember its result at the respective location. After 3 digits have been updated, all items were tested in random order by sequentially cueing one of the locations in the 4x4 grid in which items were presented and asking participants to enter the digit they remembered in this position on the number pad.
+In the number updating task, participants saw 3 to 5 digits in different locations of a 4x4 grid. They were instructed to remember these digits at the location they were presented in. After all digits have were presented there were 3 updating steps. In each updating step a transformation (+/- 1 or 2) was shown in one of locations a digit was presented in. Participants were instructed to perform this transformation and remember its result at the respective location. After 3 random digits have been updated, all items were tested in random order by sequentially cueing one of the locations in the 4x4 grid in which items were presented and asking participants to enter the digit they remembered in this position on the number pad.
 
-As in the Color-Location Binding task, each digit or transformation was presented for one second with an inter-stimulus interval of one second. Retrieval started after all encoding and transformation steps were finished with a short retention interval of one second. There were 7 trial in each set size, and performance was measured by first calculating the proportion correct in each trial and then aggregating it over all trials irrespective of set size.
+As in the color-location binding task, each digit or transformation was presented for one second with an inter-stimulus interval of one second. Retrieval started after all encoding and transformation steps were finished with a short retention interval of one second. There were 7 trials in each set size, and performance was measured by first calculating the proportion correct in each trial and then aggregating it over all trials irrespective of set size.
 
-### Letter Complex Span
+#### Letter Complex Span
 
-In this task, participants saw 3 to 5 green letters in different locations of a 4x4 grid. They were instructed to remember these letters at the location they were presented in. Interleaving the green letters, red letters were shown as distractors. To ensure that memory items (green letters) and distractors (red letters) were sufficiently processed, participants had to judge for each letter either if it was located on the left or right or the grid, or the letter was a vowel or consonant. For this, they were instructed to respond with the left and right arrow key for the location processing and the up and down arrow key for the letter processing.
+In the letter complex span task, participants saw 3 to 5 green letters in different locations of a 4x4 grid. They were instructed to remember these letters at the location they were presented in. Interleaving the green letters, red letters were shown as distractors. To ensure that memory items (green letters) and distractors (red letters) were sufficiently processed, participants had to judge for each letter either if it was located on the left or right of the grid, or the letter was a vowel or consonant. For this, they were instructed to respond with the left and right arrow key for the location judgement and the up and down arrow key for the consonant/vowel judgement.
 
 Participants were informed about which processing task to perform in the current trial at the beginning of each trial. Then all memory items and distractors were shown sequentially. The letters were presented for 1.5 seconds with a 1 second inter-stimulus interval between memory items and distractors. The processing task needed to be performed while the letters were on screen. Then after all letters and distractors were shown, all memory items were tested. As in the Color-Location Binding task, participants were either cued by location and had to type the letter they remembered in this position, or were cued with a letter and had to click on the position they remembered the letter in in the 4x4 grid. There were 4 trials in each set size crossing the retrieval cue and processing task for each set size.
 
-We discarded subjects that did not perform the processing task or were below 70% accuracy. Unfortunately, `r printnum(round(missing_CS,2))`% of subjects did not pass the threshold of adequately performing the processing task and responding at least 70% correct. Given this large proportion of subject data that cannot be used we decided to not include the complex span task in our analyses. In particular, because any method for dealing with these missing values would have to assume that they are missing at random, which they are clearly not in this case.
+We discarded subjects that did not perform the processing task or were below 70% accuracy. Unfortunately, `r printnum(round(missing_CS,2))`% of subjects did not pass the threshold of adequately performing the processing task and responding at least 70% correct. Given this large proportion of subject data that cannot be used, we decided to not include the complex span task in our analyses. In particular, because any method for dealing with these missing values would have to assume that they are missing at random, which they are clearly not in this case.
 
-## Processing Speed Tasks
+### Processing Speed Tasks
 
 ```{r Prep_PSdata}
 # load data of covariates
@@ -334,9 +328,9 @@ plotRT_PS <- ggplot(data = aggData_PS_rt,
   geom_jitter(alpha = 0.2, position = ggplot2::position_jitterdodge(jitter.width = 0.25, dodge.width = plot_dodge)) +
   labs(y = "Mean Reaction Time (in s)", x = "Task Difficulty", color = "Task")
 
-ggsave(filename = "E9_Descriptives_PSdrift.jpg",plotRT_PS, dpi = 300, width = 4, height = 4)
-ggsave(filename = "E9_Descriptives_PSrt.jpg",plotRT_PS, dpi = 300, width = 4, height = 4)
-ggsave(filename = "E9_Descriptives_PSacc.jpg",plotACC_PS, dpi = 300, width = 4, height = 4)
+ggsave(filename = "figures_E2/E2_Descriptives_PSdrift.jpg",plotRT_PS, dpi = 300, width = 4, height = 4)
+ggsave(filename = "figures_E2/E2_Descriptives_PSrt.jpg",plotRT_PS, dpi = 300, width = 4, height = 4)
+ggsave(filename = "figures_E2/E2_Descriptives_PSacc.jpg",plotACC_PS, dpi = 300, width = 4, height = 4)
 
 aggData_PS <- aggData_PS %>% 
   tidyr::pivot_wider(names_from = c(task),
@@ -346,66 +340,27 @@ aggData_PS$nTaskMissing <- rowSums(is.na(aggData_PS[,2:10]))
 
 aggData_PS <- aggData_PS %>% 
   filter(nTaskMissing <= 3)
-
-if (multivariate_outlier_delete == "yes") {
-  #create new column in data frame to hold Mahalanobis distances
-  aggData_PS$mahal1 <- mahalanobis(aggData_PS[,2:4], colMeans(aggData_PS[,2:4], na.rm = T), cov(aggData_PS[,2:4], use = "complete.obs"))
-  aggData_PS$mahal2 <- mahalanobis(aggData_PS[,5:7], colMeans(aggData_PS[,5:7], na.rm = T), cov(aggData_PS[,5:7], use = "complete.obs"))
-  aggData_PS$mahal3 <- mahalanobis(aggData_PS[,8:10], colMeans(aggData_PS[,8:10], na.rm = T), cov(aggData_PS[,8:10], use = "complete.obs"))
-  
-  aggData_PS$mahal4 <- mahalanobis(aggData_PS[,c(2,4)], colMeans(aggData_PS[,c(2,4)], na.rm = T), cov(aggData_PS[,c(2,4)], use = "complete.obs"))
-  aggData_PS$mahal5 <- mahalanobis(aggData_PS[,c(5,7)], colMeans(aggData_PS[,c(5,7)], na.rm = T), cov(aggData_PS[,c(5,7)], use = "complete.obs"))
-  aggData_PS$mahal6 <- mahalanobis(aggData_PS[,c(8,10)], colMeans(aggData_PS[,c(8,10)], na.rm = T), cov(aggData_PS[,c(8,10)], use = "complete.obs"))
-  
-  aggData_PS$mahal7 <- mahalanobis(aggData_PS[,3:4], colMeans(aggData_PS[,3:4], na.rm = T), cov(aggData_PS[,3:4], use = "complete.obs"))
-  aggData_PS$mahal8 <- mahalanobis(aggData_PS[,6:7], colMeans(aggData_PS[,6:7], na.rm = T), cov(aggData_PS[,6:7], use = "complete.obs"))
-  aggData_PS$mahal9 <- mahalanobis(aggData_PS[,9:10], colMeans(aggData_PS[,9:10], na.rm = T), cov(aggData_PS[,9:10], use = "complete.obs"))
-  
-  #create new column in data frame to hold p-value for each Mahalanobis distance
-  aggData_PS$p1 <- pchisq(aggData_PS$mahal1, df = 2, lower.tail = FALSE)
-  aggData_PS$p2 <- pchisq(aggData_PS$mahal2, df = 2, lower.tail = FALSE)
-  aggData_PS$p3 <- pchisq(aggData_PS$mahal3, df = 2, lower.tail = FALSE)
-  
-  aggData_PS$p4 <- pchisq(aggData_PS$mahal4, df = 1, lower.tail = FALSE)
-  aggData_PS$p5 <- pchisq(aggData_PS$mahal5, df = 1, lower.tail = FALSE)
-  aggData_PS$p6 <- pchisq(aggData_PS$mahal6, df = 1, lower.tail = FALSE)
-  
-  aggData_PS$p7 <- pchisq(aggData_PS$mahal7, df = 1, lower.tail = FALSE)
-  aggData_PS$p8 <- pchisq(aggData_PS$mahal8, df = 1, lower.tail = FALSE)
-  aggData_PS$p9 <- pchisq(aggData_PS$mahal9, df = 1, lower.tail = FALSE)
-  
-  aggData_PS <- aggData_PS %>% 
-    filter(p1 > .01 | is.na(p1)) %>% 
-    filter(p2 > .01 | is.na(p2)) %>% 
-    filter(p3 > .01 | is.na(p3)) %>% 
-    filter(p4 > .001 | is.na(p4)) %>% 
-    filter(p5 > .001 | is.na(p5)) %>% 
-    filter(p6 > .001 | is.na(p6)) %>% 
-    filter(p7 > .001 | is.na(p7)) %>% 
-    filter(p8 > .001 | is.na(p8)) %>% 
-    filter(p9 > .001 | is.na(p9)) 
-}
 ```
 
-### Color Judgement
+#### Color Judgement
 
-In this task, participants saw a 10x10 grid of black and white tiles and were instructed to decide if there were more black or white tiles in the grid. The difficulty of the decision was varied from easy (55 % black or white), to medium (53% black or white), and hard (51% black or white). Participants responded by pressing the left and right arrow keys to indicate if they detected more black or white tiles.
+In the color judgement (CJ) task, participants saw a 10x10 grid of black and white tiles and were instructed to decide if there were more black or white tiles in the grid. The difficulty of the decision was varied from easy (55 % black or white), to medium (53% black or white), and hard (51% black or white). Participants responded by pressing the left and right arrow keys to indicate if they detected more black or white tiles.
 
-Each trial of this task started with a fixation cross shown for 600 ms in the center of the screen. Then the 10x10 grid with black and white tiles was shown until participants responded. Then, after an inter-trial interval of 1200 ms, the next trial started. There were 34 trials per difficulty level. We analyzed both reaction times and proportion correct using the ez-Diffusion Model.
+Each trial of this task started with a fixation cross shown for 600 ms in the center of the screen. Then the 10x10 grid with black and white tiles was shown until participants responded. Then, after an inter-trial interval of 1200 ms, the next trial started. There were 34 trials per difficulty level. We analyzed both reaction times and proportion correct using the ez-Diffusion Model and used drift rate (v) as an indicator for processing speed.
 
-### Number Judgement
+#### Number Judgement
 
-In this task, participants saw two digits left and right from the center of the screen and had to decide which of the two was larger. The difficulty of the decision varied from easy (difference = 3), to medium (difference = 2), and hard (difference = 1). Participants responded by pressing the left or right arrow key to indicate which digit was larger.
+In the number judgement (NJ) task, participants saw two digits left and right from the center of the screen and had to decide which of the two was larger. The difficulty of the decision varied from easy (difference = 3), to medium (difference = 2), and hard (difference = 1). Participants responded by pressing the left or right arrow key to indicate which digit was larger.
 
-As for the Color Judgement task, each trial started with a fixation cross shown for 600 ms in the center of the screen. Then the two digits appeared left and right of the fixation cross and stayed on screen until participants responded. Then, after an inter-trial interval of 1200 ms, the next trial started. There were 36 trials in each difficulty level. We analyzed both reaction times and proportion correct using the ez-Diffusion Model.
+As for the Color Judgement task, each trial started with a fixation cross shown for 600 ms in the center of the screen. Then the two digits appeared left and right of the fixation cross and stayed on screen until participants responded. Then, after an inter-trial interval of 1200 ms, the next trial started. There were 36 trials in each difficulty level. We analyzed both reaction times and proportion correct using the ez-Diffusion Model and used drift rate (v) as an indicator for processing speed.
 
-### Choice Reaction Task
+#### Choice Reaction Task
 
-In this task, participants saw one, two, or four boxes left, right, above, or below the center of the screen. Then, a "\#" appeared in one of the boxes and they had to press the corresponding arrow key. The difficulty varied through showing one box (easy), two boxes (medium), or four boxes (hard). This was designed following the principles of the classical Hick task varying the potential number of choices, participants have to select a response from.
+In the choice reaction task (CRT), participants saw one, two, or four boxes left, right, above, or below the center of the screen. Then, a "\#" appeared in one of the boxes and they had to press the corresponding arrow key. The difficulty varied through showing one box (easy), two boxes (medium), or four boxes (hard). This was designed following the principles of the classical Hick task varying the potential number of choices, participants have to select a response from.
 
-Again, the trial started with a fixation cross shown for 400 ms. Then either one, two, or four boxes appeared to mark in which positions the target could appear in were shown. After 800 to 1200 ms a "\#" appeared in one of the boxes and participants had to press the corresponding arrow key as fast as possible.[^2] Then, after a short inter-trial interval shown for 800 ms, the next trial started. There were 32 trials in each difficulty level. We analyzed both reaction times and proportion correct using the ez-Diffusion Model.
+Again, the trial started with a fixation cross shown for 400 ms. Then either one, two, or four boxes appeared to mark in which positions the target could appear in were shown. After 800 to 1200 ms a "\#" appeared in one of the boxes and participants had to press the corresponding arrow key as fast as possible.[^3] Then, after a short inter-trial interval shown for 800 ms, the next trial started. There were 32 trials in each difficulty level. We analyzed both reaction times and proportion correct using the ez-Diffusion Model and used drift rate (v) as an indicator for processing speed.
 
-[^2]: Due to a programming error there was a response deadline of 1000 ms. But as the number of missed responses was very low (\< .5%) we decided to include this task in the analyses.
+[^3]: Due to a programming error there was a response deadline of 1000 ms. But as the number of missed responses was very low (\< .5%) we decided to include this task in the analyses.
 
 ## Data Analysis
 
@@ -417,17 +372,17 @@ n_filter <- nrow(data)
 prop_filter <- (1 - n_filter/n_full) * 100
 ```
 
-Prior to data analysis we removed trials with reaction times shorter than 150 ms and longer than 5000ms in the Saccade task and all reaction time tasks. This resulted in discarding `r papaja::printnum(prop_filter)`% of data in the saccade task, and `r papaja::printnum(prop_removed_PS)`% in the processing speed tasks.
+Prior to data analysis we removed trials with reaction times shorter than 150 ms and longer than 5000ms in the manual saccade task and reaction times shorter than 50md and longer than 5000 ms in all reaction time tasks. This resulted in discarding `r papaja::printnum(prop_filter)`% of data in the manual saccade task, and `r papaja::printnum(prop_removed_PS)`% in the processing speed tasks.
 
 # Manual Saccade Experiment
 
-In the Manual Saccade Experiment, we again analyzed the number of correct responses with a Bayesian Generalized Linear Model assuming the number of correct responses follows a binomial distribution. Like for Experiment 1, we used a logit link function, thus estimating the linear model on the logit-scale. The model was estimated using the R package `brms`.
+In the Manual Saccade Experiment, we again analyzed the number of correct responses with a Bayesian Generalized Linear Model assuming the number of correct responses follows a binomial distribution. Like for Experiment 1, we used a logit link function estimating the linear model on the logit-scale. The model was estimated using the R package `brms`.
 
 ```{r model_family}
 model_family <- brmsfamily("binomial", link = "logit")
 ```
 
-We estimated the same theoretically motivated model separating different processes contributing to performance in the Saccade Task. The goal of this study was to investigate which of these processes was related to individual differences in working memory capacity and processing speed. Therefore we additionally predicted the different processes by working memory capacity and processing speed. For this, we seperately entered either working memory capacity or processing speed as a predictor of the different processes into the GLM model. In addition, we extracted the subject estimates of the different processes from the GLM without entering either working memory capacity and processing speed as a predictor and then correlated these with working memory capacity and intelligence.
+We also estimated the same theoretically motivated model separating the different processes contributing to performance in the Saccade Task. The goal of this study was to investigate which of these processes was related to individual differences in working memory capacity and processing speed. Therefore we additionally predicted the different processes by working memory capacity and processing speed. For this, we separately entered either working memory capacity or processing speed as a predictor of the different processes into the GLM model. In addition, we extracted the subject estimates of the different processes from the GLM without entering either working memory capacity and processing speed as a predictor and then correlated these with working memory capacity and intelligence.
 
 ```{r LinearModel}
 model_sat <- bf(correct | trials(nTrials) ~ 
@@ -436,44 +391,178 @@ model_sat <- bf(correct | trials(nTrials) ~
                   # random effects
                   (0 + Block + Block:CTI_num | ID))
 
-model_th_full <- bf(correct | trials(nTrials) ~ Baseline - 
-                      inhibition * (ActCue * exp(-exp(filterSpeed)*CTI_num)) + 
-                      binding * (bindingAct * CTI_num) +
-                      SaccadeFromCue * Reflexive +
-                      SaccadeFromFixation * Saccade,
-                    Baseline ~ 1 + (1 |r| ID),
-                    Reflexive ~ 1 + (1 |r| ID),
-                    Saccade ~ 1 + (1 |r| ID),
-                    ActCue ~ 1 + (1 |r| ID),
-                    filterSpeed ~ 1 + (1 |r| ID),
-                    bindingAct ~ 1 + bindArb + (1 + bindArb |r| ID),
+model_th_full <- bf(correct | trials(nTrials) ~ PercSpeed - 
+                      inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                      binding * ((bindingAct + bindArb * arbBind) * CTI_num) +
+                      bottomup * capture +
+                      saccade * saccReq +
+                      goalMain * FixDur_num,
+                    PercSpeed  ~ 1 + (1 | r | ID),
+                    goalMain   ~ 1 + (1 | r | ID),
+                    capture    ~ 1 + (1 | r | ID),
+                    saccReq    ~ 1 + (1 | r | ID),
+                    InhibPro   ~ 1 + (1 | r | ID),
+                    InhibReac  ~ 1 + (1 | r | ID),
+                    bindingAct ~ 1 + (1 | r | ID),
+                    arbBind    ~ 1 + (1 | r | ID),
                     nl = TRUE)
 
-model_th_PS <- bf(correct | trials(nTrials) ~ Baseline - 
-                      inhibition * (ActCue * exp(-exp(filterSpeed)*CTI_num)) + 
-                      binding * (bindingAct * CTI_num) +
-                      SaccadeFromCue * Reflexive +
-                      SaccadeFromFixation * Saccade,
-                    Baseline ~ 1 + v + (1 |r| ID),
-                    Reflexive ~ 1 + v + (1 |r| ID),
-                    Saccade ~ 1 + v + (1 |r| ID),
-                    ActCue ~ 1 + v + (1 |r| ID),
-                    filterSpeed ~ 1 + v + (1 |r| ID),
-                    bindingAct ~ 1 + v + bindArb + (1 + bindArb |r| ID),
-                    nl = TRUE)
+model_th_noPercSD <- bf(correct | trials(nTrials) ~ PercSpeed - 
+                          inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                          binding * ((bindingAct + bindArb * arbBind) * CTI_num) +
+                          bottomup * capture +
+                          saccade * saccReq +
+                          goalMain * FixDur_num,
+                        PercSpeed  ~ 1,
+                        goalMain   ~ 1 + (1 | r | ID),
+                        capture    ~ 1 + (1 | r | ID),
+                        saccReq    ~ 1 + (1 | r | ID),
+                        InhibPro   ~ 1 + (1 | r | ID),
+                        InhibReac  ~ 1 + (1 | r | ID),
+                        bindingAct ~ 1 + (1 | r | ID),
+                        arbBind    ~ 1 + (1 | r | ID),
+                        nl = TRUE)
 
-model_th_WMC <- bf(correct | trials(nTrials) ~ Baseline - 
-                      inhibition * (ActCue * exp(-exp(filterSpeed)*CTI_num)) + 
-                      binding * (bindingAct * CTI_num) +
-                      SaccadeFromCue * Reflexive +
-                      SaccadeFromFixation * Saccade,
-                    Baseline ~ 1 + WMC_g + (1 |r| ID),
-                    Reflexive ~ 1 + WMC_g + (1 |r| ID),
-                    Saccade ~ 1 + WMC_g + (1 |r| ID),
-                    ActCue ~ 1 + WMC_g + (1 |r| ID),
-                    filterSpeed ~ 1 + WMC_g + (1 |r| ID),
-                    bindingAct ~ 1 + WMC_g + (1 |r| ID),
-                    nl = TRUE)
+model_th_noGoalSD <- bf(correct | trials(nTrials) ~ PercSpeed - 
+                          inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                          binding * ((bindingAct + bindArb * arbBind) * CTI_num) +
+                          bottomup * capture +
+                          saccade * saccReq +
+                          goalMain * FixDur_num,
+                        PercSpeed  ~ 1 + (1 | r | ID),
+                        goalMain   ~ 1,
+                        capture    ~ 1 + (1 | r | ID),
+                        saccReq    ~ 1 + (1 | r | ID),
+                        InhibPro   ~ 1 + (1 | r | ID),
+                        InhibReac  ~ 1 + (1 | r | ID),
+                        bindingAct ~ 1 + (1 | r | ID),
+                        arbBind    ~ 1 + (1 | r | ID),
+                        nl = TRUE)
+
+model_th_noCapSD <- bf(correct | trials(nTrials) ~ PercSpeed - 
+                         inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                         binding * ((bindingAct + bindArb * arbBind) * CTI_num) +
+                         bottomup * capture +
+                         saccade * saccReq +
+                         goalMain * FixDur_num,
+                       PercSpeed  ~ 1 + (1 | r | ID),
+                       goalMain   ~ 1 + (1 | r | ID),
+                       capture    ~ 1,
+                       saccReq    ~ 1 + (1 | r | ID),
+                       InhibPro   ~ 1 + (1 | r | ID),
+                       InhibReac  ~ 1 + (1 | r | ID),
+                       bindingAct ~ 1 + (1 | r | ID),
+                       arbBind    ~ 1 + (1 | r | ID),
+                       nl = TRUE)
+
+model_th_noSacSD <- bf(correct | trials(nTrials) ~ PercSpeed - 
+                         inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                         binding * ((bindingAct + bindArb * arbBind) * CTI_num) +
+                         bottomup * capture +
+                         saccade * saccReq +
+                         goalMain * FixDur_num,
+                       PercSpeed  ~ 1 + (1 | r | ID),
+                       goalMain   ~ 1 + (1 | r | ID),
+                       capture    ~ 1 + (1 | r | ID),
+                       saccReq    ~ 1,
+                       InhibPro   ~ 1 + (1 | r | ID),
+                       InhibReac  ~ 1 + (1 | r | ID),
+                       bindingAct ~ 1 + (1 | r | ID),
+                       arbBind    ~ 1 + (1 | r | ID),
+                       nl = TRUE)
+
+model_th_noInhProSD <- bf(correct | trials(nTrials) ~ PercSpeed - 
+                            inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                            binding * ((bindingAct + bindArb * arbBind) * CTI_num) +
+                            bottomup * capture +
+                            saccade * saccReq +
+                            goalMain * FixDur_num,
+                          PercSpeed  ~ 1 + (1 | r | ID),
+                          goalMain   ~ 1 + (1 | r | ID),
+                          capture    ~ 1 + (1 | r | ID),
+                          saccReq    ~ 1 + (1 | r | ID),
+                          InhibPro   ~ 1,
+                          InhibReac  ~ 1 + (1 | r | ID),
+                          bindingAct ~ 1 + (1 | r | ID),
+                          arbBind    ~ 1 + (1 | r | ID),
+                          nl = TRUE)
+
+model_th_noInhReSD <- bf(correct | trials(nTrials) ~ PercSpeed - 
+                           inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                           binding * ((bindingAct + bindArb * arbBind) * CTI_num) +
+                           bottomup * capture +
+                           saccade * saccReq +
+                           goalMain * FixDur_num,
+                         PercSpeed  ~ 1 + (1 | r | ID),
+                         goalMain   ~ 1 + (1 | r | ID),
+                         capture    ~ 1 + (1 | r | ID),
+                         saccReq    ~ 1 + (1 | r | ID),
+                         InhibPro   ~ 1 + (1 | r | ID),
+                         InhibReac  ~ 1,
+                         bindingAct ~ 1 + (1 | r | ID),
+                         arbBind    ~ 1 + (1 | r | ID),
+                         nl = TRUE)
+
+model_th_noBindSD <- bf(correct | trials(nTrials) ~ PercSpeed - 
+                          inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                          binding * ((bindingAct + bindArb * arbBind) * CTI_num) +
+                          bottomup * capture +
+                          saccade * saccReq +
+                          goalMain * FixDur_num,
+                        PercSpeed  ~ 1 + (1 | r | ID),
+                        goalMain   ~ 1 + (1 | r | ID),
+                        capture    ~ 1 + (1 | r | ID),
+                        saccReq    ~ 1 + (1 | r | ID),
+                        InhibPro   ~ 1 + (1 | r | ID),
+                        InhibReac  ~ 1 + (1 | r | ID),
+                        bindingAct ~ 1,
+                        arbBind    ~ 1 + (1 | r | ID),
+                        nl = TRUE)
+
+model_th_noArbBindSD <- bf(correct | trials(nTrials) ~ PercSpeed - 
+                             inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                             binding * ((bindingAct + bindArb * arbBind) * CTI_num) +
+                             bottomup * capture +
+                             saccade * saccReq +
+                             goalMain * FixDur_num,
+                           PercSpeed  ~ 1 + (1 | r | ID),
+                           goalMain   ~ 1 + (1 | r | ID),
+                           capture    ~ 1 + (1 | r | ID),
+                           saccReq    ~ 1 + (1 | r | ID),
+                           InhibPro   ~ 1 + (1 | r | ID),
+                           InhibReac  ~ 1 + (1 | r | ID),
+                           bindingAct ~ 1 + (1 | r | ID),
+                           arbBind    ~ 1,
+                           nl = TRUE)
+
+model_th_reduced <- bf(correct | trials(nTrials) ~ PercSpeed - 
+                         inhibition * (InhibPro * exp(-InhibReac*CTI_num)) + 
+                         binding * ((bindingAct + bindArb * arbBind) * CTI_num) +
+                         bottomup * capture +
+                         saccade * saccReq +
+                         goalMain * FixDur_num,
+                       PercSpeed  ~ 1 + (1 | r | ID),
+                       goalMain   ~ 1 + (1 | r | ID),
+                       capture    ~ 1 + (1 | r | ID),
+                       saccReq    ~ 1 + (1 | r | ID),
+                       InhibPro   ~ 1 + (1 | r | ID),
+                       InhibReac  ~ 1,
+                       bindingAct ~ 1 + (1 | r | ID),
+                       arbBind    ~ 1 + (1 | r | ID),
+                       nl = TRUE)
+
+all_model_formulas <- list(saturated = model_sat, 
+                           th_full = model_th_full, 
+                           noPercSD = model_th_noPercSD, 
+                           noGoalSD = model_th_noGoalSD, 
+                           noCapSD = model_th_noCapSD, 
+                           noSacSD = model_th_noSacSD, 
+                           noInhProSD =model_th_noInhProSD, 
+                           noInhReSD = model_th_noInhReSD, 
+                           noBindSD = model_th_noBindSD,
+                           noArbBindSD = model_th_noArbBindSD,
+                           reduced = model_th_reduced)
+
 ```
 
 To obtain single covariates for working memory capacity and processing speed, we fitted confirmatory factor models to the proportion correct in working memory tasks, and the drift rate in processing speed tasks and extracted the factor scores of the latent factor capturing the shared variance of the indicators for working memory capacity and processing speed.
@@ -506,20 +595,29 @@ WMC_scores$ID <- aggData_WMC$ID
 
 COV_scores <- PS_scores %>% full_join(WMC_scores)
 agg_data <- agg_data %>% left_join(COV_scores)
+colnames(agg_data) <- gsub("_g","",colnames(agg_data))
 ```
 
-For all model parameters, we used moderately informative normal priors centered on zero with a standard deviation of one. Parameters were estimated with four independent MCMC chains retaining 10000 samples for each chain after 2000 warm-up samples.
+For all model parameters in the GLM, we used moderately informative normal priors centered on zero with a standard deviation of one. Parameters were estimated with four independent MCMC chains retaining 10000 samples for each chain after 2000 warm-up samples.
 
 ```{r Priors}
-saturated_priors <- prior("logistic(0,1)", class = b)
-theoretical_priors <- prior("normal(0,1)", class = b, nlpar = Baseline) +
-  prior("normal(0,1)", class = b, nlpar = ActCue) +
-  prior("normal(0,1)", class = b, nlpar = filterSpeed) +
-  prior("normal(0,1)", class = b, nlpar = bindingAct)
-theoretical_priors_reduced <- prior("normal(0,1)", class = b, nlpar = Baseline) +
-  prior("normal(0,1)", class = b, nlpar = ActCue) +
-  prior("normal(0,1)", class = b, nlpar = filterSpeed) +
-  prior("normal(0,1)", class = b, nlpar = bindingAct)
+sat_priors <- prior("logistic(0,1)", class = b)
+theoretical_priors <- prior("normal(0,1)", class = b, nlpar = PercSpeed) +
+  prior("normal(0,1)", class = b, nlpar = goalMain) +
+  prior("normal(0,1)", class = b, nlpar = capture) +
+  prior("normal(0,1)", class = b, nlpar = saccReq) +
+  prior("normal(0,1)", class = b, nlpar = InhibPro) +
+  prior("normal(0,1)", class = b, nlpar = InhibReac) +
+  prior("normal(0,1)", class = b, nlpar = bindingAct) +
+  prior("normal(0,1)", class = b, nlpar = arbBind)
+theoretical_priors_reduced <- prior("normal(0,1)", class = b, nlpar = PercSpeed) +
+  prior("normal(0,1)", class = b, nlpar = goalMain) +
+  prior("normal(0,1)", class = b, nlpar = capture) +
+  prior("normal(0,1)", class = b, nlpar = saccReq) +
+  prior("normal(0,1)", class = b, nlpar = InhibPro) +
+  prior("constant(0)", class = b, nlpar = InhibReac) +
+  prior("normal(0,1)", class = b, nlpar = bindingAct) +
+  prior("normal(0,1)", class = b, nlpar = arbBind)
 ```
 
 ```{r sampling_settings}
@@ -533,7 +631,7 @@ postwarmup_samples <- 10000
 ## Descriptive Statistics
 
 ```{r TableDesc, echo=FALSE, fig.align='center', out.width="80%"}
-#| label: tbl-descriptives
+#| label: tbl-descriptivesCTI
 #| tab-cap: "Desciptive statistiscs for the proportion correct in the different experimental conditions and each CTI condition."
 table_data <- agg_data %>% 
   group_by(Block, CTI_num) %>% 
@@ -542,35 +640,63 @@ table_data <- agg_data %>%
             Min = min(correct/nTrials),
             Max = max(correct/nTrials),
             .groups = "drop") %>% 
-  mutate(CTI_num = as.factor(round(CTI_num * 100)))
+  mutate(CTI_num = as.factor(round(CTI_num * 1000)))
 
 names(table_data)[which(names(table_data) == "CTI_num")] <- "CTI"
 
 knitr::kable(table_data,digits = 2)
 ```
 
-The summary statistics for the Proportion of correct responses in the five different blocks for all CTI durations are given in @tbl-descriptives. @fig-descriptive displays the average performance across the different conditions and includes performance of each subject in each of the conditions.
+
+```{r TableDesc}
+#| label: tbl-descriptivesFixDur
+#| tab-cap: "Desciptive statistiscs for the proportion correct in the different experimental conditions and each Fixation duration condition."
+table_data <- agg_data %>% 
+  group_by(Block, FixDur_num) %>% 
+  summarise(Mean = mean(correct/nTrials),
+            SD = sd(correct/nTrials),
+            Min = min(correct/nTrials),
+            Max = max(correct/nTrials),
+            .groups = "drop") %>% 
+  mutate(FixDur_num = as.factor(round(FixDur_num * 1000 + (mean(unique(data$FixDur))))))
+
+names(table_data)[which(names(table_data) == "FixDur_num")] <- "Fixation Dur."
+
+knitr::kable(table_data,digits = 2)
+```
+
+The summary statistics for the proportion of correct responses in the five different blocks for all CTI durations are given in @tbl-descriptives. @fig-descriptive displays the average performance across the different conditions and includes performance of each subject in each of the conditions.
 
 ```{r FigDesc, echo=FALSE}
-desc_plot <- ggplot(data = agg_data,
-                    aes(x = as.factor(CTI_num), y = correct/nTrials, color = as.factor(Block), fill = as.factor(Block), 
-                        group = as.factor(Block), shape = as.factor(SaccadeFromCue))) +
+plot_data <- data %>%
+  dplyr::group_by(ID, Block, bottomup, saccade, inhibition, binding, CTI, CTI_num) %>%
+  dplyr::summarise(
+    correct = sum(correct),
+    nTrials = dplyr::n(),
+    .groups = "drop"
+  )
+
+desc_plot <- ggplot(data = plot_data,
+                    aes(x = as.factor(CTI_num*100), y = correct/nTrials, color = as.factor(Block), fill = as.factor(Block), 
+                        group = as.factor(Block), shape = as.factor(bottomup))) +
   facet_grid(inhibition ~ binding, labeller = label_both) +
-  stat_summary(position = position_dodge(plot_dodge)) +
-  ggplot2::stat_summary(geom = "line", fun = "mean", position = ggplot2::position_dodge(plot_dodge)) +
   ggplot2::geom_jitter(position = ggplot2::position_jitterdodge(jitter.width = jitter_width, dodge.width = plot_dodge),
                        alpha = point_alpha) +
+  stat_summary(position = position_dodge(plot_dodge), fun.data = mean_se) +
+  ggplot2::stat_summary(geom = "line", fun = "mean", position = ggplot2::position_dodge(plot_dodge)) +
   geom_hline(yintercept = 0.33, color = "red", linetype = "dashed") +
   labs(x = "Cue-Target Interval",
        y = "Proportion Correct",
        color = "Block", fill = "Block",
        shape = "Pos Cue = Target",
        title = "Descriptive Plot") +
-  coord_cartesian(ylim = c(0,1))
-ggsave(filename = "E9_Descriptives.jpg",desc_plot, dpi = 300, width = 7, height = 6)
+  coord_cartesian(ylim = c(0,1)) +
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank())
+ggsave(filename = "figures_E2/E9_Descriptives.jpg",desc_plot, dpi = 300, width = 7, height = 6)
 ```
 
-![Average performance in the different experimental blocks for different CTI durations.](E9_Descriptives.jpg){#fig-descriptive}
+![Average performance in the different experimental blocks for different CTI durations.](figures_E2/E9_Descriptives.jpg){#fig-descriptive}
 
 @fig-descriptivesCov shows the performance in the working memory capacity and processing speed tasks.
 
@@ -588,89 +714,69 @@ plotDrift_PS
 ## GLM: Accuracy
 
 ```{r FitModel, include=FALSE}
-fit_E9_sat <- brms::brm(model_sat,
-                        data = agg_data,
-                        family = model_family,
-                        backend = "cmdstanr",
-                        chains = nChains,
-                        iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
-                        prior = saturated_priors,
-                        save_pars = save_pars(all = T),
-                        sample_prior = T,
-                        file = "fit_Exp9_sat",
-                        file_refit = "on_change")
-
-fit_E9_th_full <- brms::brm(model_th_full,
-                            data = agg_data,
-                            family = model_family,
-                            backend = "cmdstanr",
-                            chains = nChains,
-                            iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
-                            prior = theoretical_priors,
-                            save_pars = save_pars(all = T),
-                            sample_prior = T,
-                            file = "fit_Exp9_th_full",
-                            file_refit = "on_change")
-
-fit_E9_th_PS <- brms::brm(model_th_PS,
-                          data = agg_data,
-                          family = model_family,
-                          backend = "cmdstanr",
-                          chains = nChains,
-                          iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
-                          prior = theoretical_priors,
-                          save_pars = save_pars(all = T),
-                          sample_prior = T,
-                          file = "fit_Exp9_th_PS",
-                          file_refit = "on_change")
-
-fit_E9_th_WMC <- brms::brm(model_th_WMC,
-                           data = agg_data,
-                           family = model_family,
-                           backend = "cmdstanr",
-                           chains = nChains,
-                           iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
-                           prior = theoretical_priors,
-                           save_pars = save_pars(all = T),
-                           sample_prior = T,
-                           file = "fit_Exp9_th_WMC",
-                           file_refit = "on_change")
-
-fit_E9_th_full_prior <- brms::brm(model_th_full,
+fitted_models <- list()
+marginalLL <- list()
+for(i in 1:length(all_model_formulas)) {
+  model_name <- names(all_model_formulas)[i]
+  model_formula = all_model_formulas[[i]]
+  
+  if (model_name == "saturated") {
+    priors <- sat_priors
+  } else if(model_name == "reduced") {
+    priors <- theoretical_priors_reduced
+  } else {
+    priors <- theoretical_priors
+  }
+  
+  fitted_models[[i]] <- brms::brm(model_formula,
                                   data = agg_data,
                                   family = model_family,
                                   backend = "cmdstanr",
                                   chains = nChains,
-                                  iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
-                                  prior = theoretical_priors,
+                                  iter = warmup_samples + postwarmup_samples, 
+                                  warmup = warmup_samples,
+                                  prior = priors,
                                   save_pars = save_pars(all = T),
-                                  sample_prior = "only",
-                                  file = "fit_Exp9_th_full_prior",
+                                  file = paste0("modelFits_E2/fit_E2_", model_name),
                                   file_refit = "on_change")
+  
+  if (!file.exists(paste("modelFits_E2/bridge_E2_", model_name, ".rds", sep = ""))) {
+    bridge <- bridge_sampler(fitted_models[[i]], cores = 4, repetitions = 10)
+    saveRDS(bridge, paste("modelFits_E2/bridge_E2_", model_name, ".rds", sep = ""))
+  } else {
+    bridge <- readRDS(paste("modelFits_E2/bridge_E2_", model_name, ".rds", sep = ""))
+  }
+  
+  marginalLL[[i]] <- bridge
+}
 
-fit_E9_th_PS_prior <- brms::brm(model_th_PS,
-                                data = agg_data,
-                                family = model_family,
-                                backend = "cmdstanr",
-                                chains = nChains,
-                                iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
-                                prior = theoretical_priors,
-                                save_pars = save_pars(all = T),
-                                sample_prior = "only",
-                                file = "fit_Exp9_th_PS_prior",
-                                file_refit = "on_change")
-
-fit_E9_th_WMC_prior <- brms::brm(model_th_WMC,
+prior_models <- list()
+for(i in 1:length(all_model_formulas)) {
+  model_name <- names(all_model_formulas)[i]
+  model_formula = all_model_formulas[[i]]
+  
+  if (model_name == "saturated") {
+    priors <- sat_priors
+  } else if(model_name == "reduced") {
+    priors <- theoretical_priors_reduced
+  } else {
+    priors <- theoretical_priors
+  }
+  
+  prior_models[[i]] <- brms::brm(model_formula,
                                  data = agg_data,
                                  family = model_family,
                                  backend = "cmdstanr",
                                  chains = nChains,
-                                 iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
-                                 prior = theoretical_priors,
-                                 save_pars = save_pars(all = T),
+                                 iter = warmup_samples + postwarmup_samples, 
+                                 warmup = warmup_samples,
+                                 prior = priors,
                                  sample_prior = "only",
-                                 file = "fit_Exp9_th_WMC_prior",
+                                 save_pars = save_pars(all = T),
+                                 file = paste0("modelFits_E2/fit_E2_", model_name,"_priors"),
                                  file_refit = "on_change")
+}
+
 
 bf_pars_th_full <- bayestestR::bayesfactor_parameters(fit_E9_th_full,
                                                       prior = fit_E9_th_full_prior)
@@ -729,7 +835,7 @@ pp_plot_saturated <- ggplot(data = tidy_pred_saturated,
        shape = "Pos Cue = Target",
        title = "Posterior Predictives (Saturated)") +
   coord_cartesian(ylim = c(0,1))
-ggsave(filename = "PostPredictives_Saturated_E9.jpg",pp_plot_saturated, dpi = 300, width = 7, height = 6)
+ggsave(filename = "figures_E2/PostPredictives_Saturated_E2.jpg",pp_plot_saturated, dpi = 300, width = 7, height = 6)
 
 tidy_pred_theoretical <- fit_E9_th_full %>% 
   tidybayes::epred_draws(newdata = newdata2, ndraws = 1000) %>% 
@@ -756,16 +862,16 @@ pp_plot_theoretical <- ggplot(data = tidy_pred_theoretical,
        shape = "Pos Cue = Target",
        title = "Posterior Predictives (Theoretical)") +
   coord_cartesian(ylim = c(0,1))
-ggsave(filename = "PostPredictives_theoretical_E9.jpg",pp_plot_theoretical, dpi = 300, width = 7, height = 6)
+ggsave(filename = "figures_E2/PostPredictives_theoretical_E2.jpg",pp_plot_theoretical, dpi = 300, width = 7, height = 6)
 ```
 
 ### Experimental Effects
 
 ![](PostPredictives_theoretical_E9.jpg){#fig-predictive}
 
-@fig-predictive shows the posterior predictive estimates from the Bayesian GLM for the different experimental blocks and the changes in performance across the different CTI levels on the proportion correct scale. The theoretical model fits adequately to the observed data, as indicated by the black crosses in the plot.
+@fig-predictive shows the posterior predictive estimates from the Bayesian GLM for the different experimental blocks and the changes in performance across the different CTI levels on the proportion correct scale. The theoretical model fits adequately to the observed data, as indicated by the black crosses in the plot overlaying closely with the posterior mean predicted in each condition.
 
-As in Experiment 1, we tested if there is evidence for the different theoretical assumed processes contributing to performance in the manual Anti-Saccade task. A summary of parameter estimates is displayed in @tbl-parameters. All parameters were credibly different from zero, $BF_{01} = `r exp(min(bf_pars_th_full$log_BF\[bf_pars_th_full$log_BF > 0]))`$, which replicates the results from Experiment 1.
+As in Experiment 1, we tested if there is evidence for the different theoretical assumed processes contributing to performance in the manual Anti-Saccade task. A summary of parameter estimates is displayed in @tbl-parameters. All parameters were credibly different from zero, $BF_{01} = `r exp(min(bf_pars_th_full$log_BF[bf_pars_th_full$log_BF > 0]))`$, which replicates the results from Experiment 1.
 
 ```{r ParTable}
 #| label: tbl-parameters
@@ -775,6 +881,139 @@ rownames(fixFX) <- stringr::str_remove(rownames(fixFX), "_Intercept")
 fixFX["filterSpeed",]<- exp(fixFX["filterSpeed",])
 knitr::kable(fixFX[,c("Estimate","Q2.5","Q97.5")], digits = 2)
 ```
+
+### Individual differences
+
+```{r}
+#| label: tbl-bfSD
+#| tab-cap: "Bayes Factors in favor of individual differences in the processes seperated."
+# test if there is evidence for individual differences in the different processes
+bf_noBaseSD <- bayes_factor(marginalLL$full, marginalLL$noBaseSD)
+bf_noSfFSD <- bayes_factor(marginalLL$full, marginalLL$noSfFSD)
+bf_noSfCSD <- bayes_factor(marginalLL$full, marginalLL$noSfCSD)
+bf_noAcSD <- bayes_factor(marginalLL$full, marginalLL$noAcSD)
+bf_noFSD <- bayes_factor(marginalLL$full, marginalLL$noFSD)
+bf_noBindSD <- bayes_factor(marginalLL$full, marginalLL$noBindSD)
+bf_noBindArbSD <- bayes_factor(marginalLL$full, marginalLL$noBindArbSd)
+
+df_bf_SD <- data.frame(
+  process = c("Baseline","Saccade from Fixation", "Saccade From Cue", "Act: Cue", "Filtering", "Binding"),
+  median_bf = c(bf_noBaseSD$bf_median_based, bf_noSfFSD$bf_median_based, bf_noSfCSD$bf_median_based, bf_noAcSD$bf_median_based,
+                bf_noFSD$bf_median_based, bf_noBindSD$bf_median_based),
+  min_bf = c(min(bf_noBaseSD$bf), min(bf_noSfFSD$bf), min(bf_noSfCSD$bf), min(bf_noAcSD$bf),
+             min(bf_noFSD$bf), min(bf_noBindSD$bf)),
+  max_bf = c(max(bf_noBaseSD$bf), max(bf_noSfFSD$bf), max(bf_noSfCSD$bf), max(bf_noAcSD$bf),
+             max(bf_noFSD$bf), max(bf_noBindSD$bf))
+)
+knitr::kable(df_bf_SD, digits = 2)
+```
+
+We again tested if there are credible individual differences in the processes dissociated in our theoretical model. For this, we selectively fixed the random effect of one of the processes to zero and tested if this model was favored over a model freely estimating the random effect. These analyses indicated that there was credible evidence for individual differences in all processes separated in the model (see @tbl-bfSD).
+
+The standard deviations and correlations between the random effects are displayed in @tbl-correlations
+
+```{r CorrTable}
+#| label: tbl-correlations
+#| tab-cap: "Correlations between random effects. Values on the diagonal represent the posterior estimates of the standard deviation of each random effect."
+corr_est <- VarCorr(fit_E9_th_full)$ID
+
+cormat <- matrix(NA, nrow = nrow(fixFX), ncol = nrow(fixFX))
+
+for (i in 1:dim(corr_est$cor)[3]){
+  cormat[i,] <- corr_est$cor[,"Estimate",i]
+}
+
+rownames(cormat) <- stringr::str_remove(dimnames(corr_est$cor)[[3]],"_Intercept")
+colnames(cormat) <- stringr::str_remove(dimnames(corr_est$cor)[[3]],"_Intercept")
+diag(cormat) <- corr_est$sd[,"Estimate"]
+cormat <- round(cormat,2)
+cormat[upper.tri(cormat)] <- ""
+knitr::kable(cormat, digits = 2)
+```
+
+### Validity of the Anti-Saccade Task
+
+@fig-validity shows correlations between the random effects of processes separated in the GLM with the observed performance in the different experimental blocks. These correlations capture to what extend performance in one of the experimental blocks is a valid indicator for the processes. A process pure indicator would only correlate with one of the process measures. As is evident from the table, none of the experimental blocks is a truly process pure indicator for a single process. With respect to the typical use of the anti-saccade task (using a CTI of 50ms), it is measuring at least three processes: sensory discrimination, the speed of filtering automatic activation, and binding ability. Any correlation with external covariates can thus stem from a correlation with any of these processes. This renders the interpretation of the predictive power of performance in the anti-saccade task complex to interpret with respect to the processes that is responsible for it.
+
+```{r}
+#| label: fig-validity
+#| fig-cap: "Validity estimates of performance in the different conditions for the seperated processes."
+agg_data_validity <- agg_data %>% 
+  mutate(pC = correct/nTrials) %>% 
+  select(ID,Block,CTI_num,pC)
+
+randFX_draws <- fit_E9_th_full %>% 
+  tidybayes::gather_draws(r_ID__Baseline[ID,],
+                          r_ID__Reflexive[ID,],
+                          r_ID__Saccade[ID,],
+                          r_ID__bindingAct[ID,term],
+                          r_ID__ActCue[ID,],
+                          r_ID__filterSpeed[ID,], ndraws = 100) %>% 
+  mutate(.variable = stringr::str_remove(.variable, "r_ID__"))
+randFX_draws$term[is.na(randFX_draws$term)] <- "Intercept"
+
+randFX_draws <- randFX_draws |> 
+  filter(term == "Intercept")
+
+randFX_draws <- randFX_draws %>% 
+  tidyr::pivot_wider(names_from = c(.variable),
+                     values_from = .value)
+
+df_validity = expand.grid(
+  ID = unique(agg_data$ID),
+  Block = unique(agg_data$Block),
+  CTI_num = unique(agg_data$CTI_num),
+  .chain = unique(randFX_draws$.chain),
+  .iteration = unique(randFX_draws$.iteration),
+  .draw = unique(randFX_draws$.draw)
+) %>% left_join(agg_data_validity, by = c("ID","Block","CTI_num")) %>% 
+  left_join(randFX_draws, by = c("ID",".chain",".draw",".iteration"))
+
+df_cor <- df_validity %>% 
+  group_by(Block, CTI_num, .draw) %>% 
+  summarise(
+    SensoryDiscrimination = cor(pC, Baseline, use = "complete.obs"),
+    CueActivation = cor(pC, ActCue, use = "complete.obs"),
+    FilterSpeed = cor(pC, filterSpeed, use = "complete.obs"),
+    Binding = cor(pC, bindingAct, use = "complete.obs"),
+    Reflexive = cor(pC, Reflexive, use = "complete.obs"),
+    Saccade = cor(pC, Saccade, use = "complete.obs"),
+    .groups = "drop") %>% 
+  tidyr::pivot_longer(cols = c(SensoryDiscrimination, CueActivation, FilterSpeed, Binding, Reflexive, Saccade)) %>% 
+  group_by(Block, CTI_num, name) %>% 
+  summarise(
+    mean = mean(value),
+    CIlow = quantile(value, probs = 0.025),
+    CIhigh = quantile(value, probs = 0.975)
+  )
+
+df_cor$process = "yes"
+
+df_cor[which(df_cor$name == "CueActivation"),]$process <- ifelse(
+  df_cor[which(df_cor$name == "CueActivation"),]$Block %in% inhib_blocks, "yes", "no")
+df_cor[which(df_cor$name == "FilterSpeed"),]$process <- ifelse(
+  df_cor[which(df_cor$name == "FilterSpeed"),]$Block %in% inhib_blocks, "yes", "no")
+df_cor[which(df_cor$name == "Binding"),]$process <- ifelse(
+  df_cor[which(df_cor$name == "Binding"),]$Block %in% bind_blocks, "yes", "no")
+df_cor[which(df_cor$name == "Reflexive"),]$process <- ifelse(
+  df_cor[which(df_cor$name == "Reflexive"),]$Block %in% SaccadeFromCue, "no", "yes")
+df_cor[which(df_cor$name == "Saccade"),]$process <- ifelse(
+  df_cor[which(df_cor$name == "Saccade"),]$Block %in% SaccadeFromFixation, "yes", "no")
+
+plot_validity <- ggplot(data = df_cor,
+                        aes(x = as.factor(CTI_num), y = mean, ymin = CIlow, ymax = CIhigh, color = Block, shape = process, alpha = process)) +
+  geom_point(position = position_dodge(0.5), size =2) +
+  geom_errorbar(width = 0, position = position_dodge(0.5), linewidth = 1) +
+  facet_wrap(~name) +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  scale_alpha_discrete(range = c(1/3,1)) +
+  labs(x = "Cue-Target Interval", y = "Validity (Correlation: Process with Prop. Corr)",
+       shape = "Process\n included:", alpha = "Process\n included:")
+
+ggsave(filename = "figures_E2/Validity_E9.jpg",plot_validity, dpi = 300, width = 7, height = 6)
+knitr::include_graphics("figures_E2/Validity_E9.jpg")
+```
+
 
 ## Relationship to Covariates
 
@@ -789,19 +1028,103 @@ randFX <- ranef(fit_E9_th_full)$ID
 df_randFX <- data.frame(
   ID = as.numeric(row.names(randFX[,,"Baseline_Intercept"])),
   Baseline = randFX[,"Estimate","Baseline_Intercept"],
-  SfF = randFX[,"Estimate","Baseline_SaccadeFromFixation1"],
-  SfC = randFX[,"Estimate","Baseline_SaccadeFromCue2"],
-  Ac = randFX[,"Estimate","ActCue_Intercept"],
-  f = randFX[,"Estimate","filterSpeed_Intercept"],
+  Reflexive = randFX[,"Estimate","Reflexive_Intercept"],
+  Saccade = randFX[,"Estimate","Saccade_Intercept"],
+  ActCue = randFX[,"Estimate","ActCue_Intercept"],
+  Filter = randFX[,"Estimate","filterSpeed_Intercept"],
   Bind = randFX[,"Estimate","bindingAct_Intercept"],
   Bind_arb = randFX[,"Estimate","bindingAct_bindArb1"]
 )
 
 df_randFX <- df_randFX %>% left_join(COV_scores)
-covmat_pred <- round(cor(df_randFX[,c(2:12)], use = "complete.obs"),2)
+covmat_pred <- round(cor(df_randFX[,c(2:7,9,12)], use = "complete.obs"),2)
 covmat_pred[upper.tri(covmat_pred)] <- ""
-knitr::kable(covmat_pred, digits = 2)
+knitr::kable(covmat_pred[7:8,1:6], digits = 2)
 ```
+
+```{r}
+cov_formulas <- list(
+ WMC = bf(correct | trials(nTrials) ~ PercSpeed - 
+                      inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                      binding * ((bindingAct + bindArb * arbBind) * CTI_num) +
+                      bottomup * capture +
+                      saccade * saccReq +
+                      goalMain * FixDur_num,
+                    PercSpeed  ~ 1 + WMC + (1 | r | ID),
+                    goalMain   ~ 1 + WMC + (1 | r | ID),
+                    capture    ~ 1 + WMC + (1 | r | ID),
+                    saccReq    ~ 1 + WMC + (1 | r | ID),
+                    InhibPro   ~ 1 + WMC + (1 | r | ID),
+                    InhibReac  ~ 1 + WMC + (1 | r | ID),
+                    bindingAct ~ 1 + WMC + (1 | r | ID),
+                    arbBind    ~ 1 + WMC + (1 | r | ID),
+                    nl = TRUE),
+ PS = bf(correct | trials(nTrials) ~ PercSpeed - 
+                      inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                      binding * ((bindingAct + bindArb * arbBind) * CTI_num) +
+                      bottomup * capture +
+                      saccade * saccReq +
+                      goalMain * FixDur_num,
+                    PercSpeed  ~ 1 + v + (1 | r | ID),
+                    goalMain   ~ 1 + v + (1 | r | ID),
+                    capture    ~ 1 + v + (1 | r | ID),
+                    saccReq    ~ 1 + v + (1 | r | ID),
+                    InhibPro   ~ 1 + v + (1 | r | ID),
+                    InhibReac  ~ 1 + v + (1 | r | ID),
+                    bindingAct ~ 1 + v + (1 | r | ID),
+                    arbBind    ~ 1 + v + (1 | r | ID),
+                    nl = TRUE)
+)
+
+fit_E9_th_PS <- brms::brm(model_th_PS,
+                          data = agg_data,
+                          family = model_family,
+                          backend = "cmdstanr",
+                          chains = nChains,
+                          iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
+                          prior = theoretical_priors,
+                          save_pars = save_pars(all = T),
+                          sample_prior = T,
+                          file = "fit_Exp9_th_PS",
+                          file_refit = "on_change")
+
+fit_E9_th_WMC <- brms::brm(model_th_WMC,
+                           data = agg_data,
+                           family = model_family,
+                           backend = "cmdstanr",
+                           chains = nChains,
+                           iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
+                           prior = theoretical_priors,
+                           save_pars = save_pars(all = T),
+                           sample_prior = T,
+                           file = "fit_Exp9_th_WMC",
+                           file_refit = "on_change")
+
+fit_E9_th_PS_prior <- brms::brm(model_th_PS,
+                                data = agg_data,
+                                family = model_family,
+                                backend = "cmdstanr",
+                                chains = nChains,
+                                iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
+                                prior = theoretical_priors,
+                                save_pars = save_pars(all = T),
+                                sample_prior = "only",
+                                file = "fit_Exp9_th_PS_prior",
+                                file_refit = "on_change")
+
+fit_E9_th_WMC_prior <- brms::brm(model_th_WMC,
+                                 data = agg_data,
+                                 family = model_family,
+                                 backend = "cmdstanr",
+                                 chains = nChains,
+                                 iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
+                                 prior = theoretical_priors,
+                                 save_pars = save_pars(all = T),
+                                 sample_prior = "only",
+                                 file = "fit_Exp9_th_WMC_prior",
+                                 file_refit = "on_change")
+```
+
 
 ```{r BayesFactors}
 BF_Baseline_WMC <- exp(bf_pars_th_WMC$log_BF[bf_pars_th_WMC$Parameter == "b_Baseline_WMC_g"])
@@ -810,7 +1133,7 @@ BF_Baseline_v <- exp(bf_pars_th_PS$log_BF[bf_pars_th_PS$Parameter == "b_Baseline
 BF_Binding_v <- exp(bf_pars_th_PS$log_BF[bf_pars_th_PS$Parameter == "b_bindingAct_v"])
 ```
 
-In addition, we entered the factor scores of WMC and processing speed as covariates into the Bayesian GLM to test which of the dissociated processes were associated to them. The posterior credibility intervals, indicated a positive relationship between WMC and the Baseline performance as well as the binding activity (see @tbl-relationshipWMC). However, Bayes Factors indicated only moderate evidence for the relationship between WMC and Baseline performance, $BF_{10} = `r apa_num(BF_Baseline_WMC)`$, and inconclusive evidence for the relationship between WMC and binding activity, $BF_{10} = `r apa_num(BF_Binding_WMC)`$. @fig-relationshipsWMC illustrates the realtionship of WMC with the dissociated processes of the GLM.
+To evaluate which of these relationships differs credibly from zero, we entered the factor scores of WMC and processing speed as covariates into the Bayesian GLM. The posterior credibility intervals, indicated a positive relationship between WMC and the Baseline performance as well as the binding activity (see @tbl-relationshipWMC). However, Bayes Factors indicated only moderate evidence for the relationship between WMC and Baseline performance, $BF_{10} = `r apa_num(BF_Baseline_WMC)`$, and inconclusive evidence for the relationship between WMC and binding activity, $BF_{10} = `r apa_num(BF_Binding_WMC)`$. @fig-relationshipsWMC illustrates the realtionship of WMC with the dissociated processes of the GLM.
 
 ```{r}
 #| label: tbl-relationshipWMC
@@ -862,52 +1185,3 @@ conditional_effects(fit_E9_th_PS, nlpar = "filterSpeed", effect = "v")
 conditional_effects(fit_E9_th_PS, nlpar = "bindingAct", effect = "v")
 ```
 
-```{r}
-agg_data_validity <- agg_data %>% 
-  mutate(pC = correct/nTrials) %>% 
-  select(ID,Block,CTI_num,pC)
-
-randFX_draws <- fit_E9_th_full %>% 
-  tidybayes::gather_draws(r_ID__Baseline[ID,term],
-                          r_ID__bindingAct[ID,term],
-                          r_ID__ActCue[ID,],
-                          r_ID__filterSpeed[ID,], ndraws = 100) %>% 
-  mutate(.variable = stringr::str_remove(.variable, "r_ID__"))
-randFX_draws$term[is.na(randFX_draws$term)] <- "Intercept"
-
-randFX_draws <- randFX_draws %>% 
-  tidyr::pivot_wider(names_from = c(.variable,term),
-              values_from = .value)
-
-df_validity = expand.grid(
-  ID = unique(agg_data$ID),
-  Block = unique(agg_data$Block),
-  CTI_num = unique(agg_data$CTI_num),
-  .chain = unique(randFX_draws$.chain),
-  .iteration = unique(randFX_draws$.iteration),
-  .draw = unique(randFX_draws$.draw)
-) %>% left_join(agg_data_validity, by = c("ID","Block","CTI_num")) %>% 
-  left_join(randFX_draws, by = c("ID",".chain",".draw",".iteration"))
-
-df_cor <- df_validity %>% 
-  group_by(Block, CTI_num, .draw) %>% 
-  summarise(
-    SensDisc = cor(pC, Baseline_Intercept, use = "complete.obs"),
-    ActCue = cor(pC, ActCue_Intercept, use = "complete.obs"),
-    Filter = cor(pC, filterSpeed_Intercept, use = "complete.obs"),
-    Binding = cor(pC, bindingAct_Intercept, use = "complete.obs"),
-    SaccCue = cor(pC, Baseline_SaccadeFromCue2, use = "complete.obs"),
-    SaccFix = cor(pC, Baseline_SaccadeFromFixation1, use = "complete.obs"),
-  .groups = "drop") %>% 
-  tidyr::pivot_longer(cols = c(SensDisc, ActCue, Filter, Binding, SaccCue, SaccFix)) %>% 
-  group_by(Block, CTI_num, name) %>% 
-  summarise(
-    mean = mean(value),
-    CIlow = quantile(value, probs = 0.025),
-    CIhigh = quantile(value, probs = 0.975)
-  ) %>% 
-  tidyr::pivot_wider(names_from = name,
-                     values_from = c(mean, CIlow, CIhigh))
-
-knitr::kable(df_cor, digits = 2)
-```

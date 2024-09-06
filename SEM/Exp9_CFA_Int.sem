@@ -1,4 +1,0 @@
-SD =~ Int_Central + Int_Color + Int_No + Int_Pro + Int_Anti + Int_Random
-
-SD2 =~ Int_No + Int_Anti + Int_Pro
-

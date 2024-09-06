@@ -6,27 +6,29 @@
 #'   of the reaction times and the proportion of correct responses and returns the ezDM
 #'   parameters.
 #'
-#' @param RT numeric. A vector of reaction times  A `formula` or `brmsformula` object that is specifies the model to be analyzed.
+#' @param RT numeric. A vector of reaction times.
 #' @param ACC numeric. A vector of accuracies to determine the proportion correct.
 #' @param s numeric. The diffusion constant. Typically set to 1 or 0.1. The default value is 1.
 #' @param robust logical. Should robust statistics, that is median and Interquartile range, be used to calculate the ezDM parameters. Default is true.
-#' @param use_RTs character. Should only be correct RTs ("correct") or all RTs (any other character) be used to calculate mean and sd of RTs.
+#' @param use_RTs character. Should only correct RTs ("correct") or all RTs (any other character) be used to calculate mean and sd of RTs.
 #'
 #' @export
 ez.dm <- function(RT, ACC, s = 1, robust = TRUE, use_RTs = "correct"){
   # The default value for the scaling parameter s equals 0.1
   s2 <- s^2
 
-  # compute descriptives
+  # compute summary statistics for accuracies
   N = length(ACC)
   Pc = mean(ACC)
 
+  # select RTs to use for summary statistics
   if (use_RTs == "correct") {
     useRTs <- RT[which(ACC == 1)]
   } else {
     useRTs <- RT
   }
 
+  # compute summary statistics for RTs
   if (robust == TRUE) {
     MRT = median(useRTs)
     VRT = (IQR(useRTs)/(qnorm(p = .75)*2))^2
@@ -35,8 +37,7 @@ ez.dm <- function(RT, ACC, s = 1, robust = TRUE, use_RTs = "correct"){
     VRT = var(useRTs)
   }
 
-
-  # edge correction is required.
+  # edge correction if required.
   if (Pc == 0 | Pc == 0.5) {
     Pc = Pc + (1/(2*N))
   } else if (Pc == 1) {

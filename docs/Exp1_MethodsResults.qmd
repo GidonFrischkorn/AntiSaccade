@@ -33,30 +33,32 @@ point_alpha <- 0.1
 ```{r data_prep}
 data <- RawData_Exp5
 nSub_total <- length(unique(data$ID))
-data$CTI_num <- (data$CTI)/100
+data$CTI_num <- (data$CTI)/1000
 data$CTI <- as.factor(data$CTI)
+data$FixDur_num <- (data$FixDur - mean(unique(data$FixDur)))/1000
+
 data$RTms <- data$RTms + 150
 
 levels(data$Block) <- stringr::str_replace_all(levels(data$Block), "[:digit:]", "")
 
 inhib_blocks <- c("Anti","Random")
 bind_blocks <- c("Pro","Anti","Colour")
-SaccadeFromCue <- c("Anti","Random","Central")
-SaccadeFromFixation <- c("Pro","Anti","Random","Central")
+bottomup_blocks <- c("NoSaccade","Pro")
+saccade_blocks <- c("Pro","Anti","Random","Central")
 
 Block2Conds <- data.frame(
   Block = unique(data$Block)
 )
 
-data$inhibition <- ifelse(data$Block %in% inhib_blocks,1,0)
-data$binding <- ifelse(data$Block %in% bind_blocks,1,0)
-data$SaccadeFromCue <- ifelse(data$Block %in% SaccadeFromCue, 0,1)
-data$SaccadeFromFixation <- ifelse(data$Block %in% SaccadeFromFixation,1,0)
+data$inhibition <- ifelse(data$Block %in% inhib_blocks, 1, 0)
+data$binding <- ifelse(data$Block %in% bind_blocks, 1, 0)
+data$bottomup <- ifelse(data$Block %in% bottomup_blocks, 1, 0)
+data$saccade <- ifelse(data$Block %in% saccade_blocks, 1, 0)
 
-Block2Conds$inhibition <- ifelse(Block2Conds$Block %in% inhib_blocks,1,0)
-Block2Conds$binding <- ifelse(Block2Conds$Block %in% bind_blocks,1,0)
-Block2Conds$SaccadeFromCue <- ifelse(Block2Conds$Block %in% SaccadeFromCue,0,1)
-Block2Conds$SaccadeFromFixation <- ifelse(Block2Conds$Block %in% SaccadeFromFixation, 1,0)
+Block2Conds$inhibition <- ifelse(Block2Conds$Block %in% inhib_blocks,1, 0)
+Block2Conds$binding <- ifelse(Block2Conds$Block %in% bind_blocks, 1, 0)
+Block2Conds$bottomup <- ifelse(Block2Conds$Block %in% bottomup_blocks, 1, 0)
+Block2Conds$saccade <- ifelse(Block2Conds$Block %in% saccade_blocks, 1, 0)
 
 outlier_data <- data %>% 
   group_by(ID, Block, CTI) %>% 
@@ -67,8 +69,10 @@ outlier_data <- data %>%
   mutate(
     meanPC_logit = logit_scaled(meanPC - (0.5/nTrials)),
     zPC_logit = (meanPC_logit - mean(meanPC_logit))/sd(meanPC_logit))
-outlier_IDs2 <- unique(outlier_data$ID[which(outlier_data$meanPC <= qbinom(p = .95, size = outlier_data$nTrials, prob = 1/3)/outlier_data$nTrials)])
-outlier_IDs <- unique(outlier_data$ID[which(outlier_data$zPC_logit <= qnorm(p = .01))])
+
+outlier_IDs_guess <- unique(outlier_data$ID[which(outlier_data$meanPC <= qbinom(p = .95, size = outlier_data$nTrials, prob = 1/3)/outlier_data$nTrials)])
+outlier_IDs_z <- unique(outlier_data$ID[which(outlier_data$zPC_logit <= qnorm(p = .01))])
+outlier_IDs <- unique(c(outlier_IDs_guess,outlier_IDs_z))
 
 data <- data %>% 
   filter(!ID %in% outlier_IDs)
@@ -76,7 +80,7 @@ nSub <- length(unique(data$ID))
 
 # aggregate data for binomial models
 agg_data <- data %>%
-  dplyr::group_by(ID, Block, SaccadeFromCue, SaccadeFromFixation, inhibition, binding, CTI, CTI_num) %>%
+  dplyr::group_by(ID, Block, bottomup, saccade, inhibition, binding, FixDur, FixDur_num, CTI, CTI_num) %>%
   dplyr::summarise(
     correct = sum(correct),
     nTrials = dplyr::n(),
@@ -87,6 +91,8 @@ agg_data <- data %>%
 ## Participants
 
 We recruited `r papaja::printnum(nSub_total)` participants via Prolific, `r nSub_total - nSub` participants were excluded for low performance, thus `r papaja::printnum(nSub)` participants were included in the data analyses. Participants were required to be 18 to 40 years old, speak English as their first language, and have an approval rate of at least 85% when participating in studies on Prolific.
+
+The Manual anti-saccade task was programmed in lab.js (Henninger et al., 2020) and run via JATOS. The task was run locally on the participants machines, but we required that a laptop or desktop computer was used. Participation using a tablet or smartphone was not allowed. All tasks were run in a single session that lasted approximately 60 to 70 minutes.
 
 ## Design
 
@@ -102,18 +108,18 @@ In addition, the blocks also differ in their requirements to perform saccades aw
 #| label: tbl-Block2Proc
 #| tab-cap: "Processes required by the different experimental blocks."
 Table_Blocks2Procs <- Block2Conds %>% 
-  mutate(SensoryDisc = 1) %>% 
-  select(Block, SensoryDisc, inhibition, binding, SaccadeFromFixation, SaccadeFromCue)
+  mutate(PercSpeed = 1) %>% 
+  select(Block, PercSpeed, inhibition, binding, saccade, bottomup)
 
 Table_Blocks2Procs[,2:6] <- ifelse(Table_Blocks2Procs[,2:6] == 1, "yes","no")
 Table_Blocks2Procs <- Table_Blocks2Procs[c(2,3,1,4,5),]
-colnames(Table_Blocks2Procs) <- c("Block", "Sensory Disc.", "Inhibition", "Binding", "Saccade from Fixation", "Saccade from Cue")
+colnames(Table_Blocks2Procs) <- c("Block", "Perceptual Speed", "Inhibition", "Binding", "Saccade", "Bottom Up")
 knitr::kable(Table_Blocks2Procs)
 ```
 
 In addition, we varied the Cue-Traget Innterval in three levels: 50, 200, 400ms to evaluate if longer time to inhibit automatic saccades towards the cued-location when required and use the location of the cue to perform a controlled saccade when possible improves performance.[^1]
 
-[^1]: *We examined the different ranges of CTI durations in two pilot experiments (Experiments S1 & 2 in the online supplement) in three of the five experimental blocks (i.e. the Pro, Anti, and Random Saccade blocks). The results of these two experiments suggested that a range from 50 to 400 ms covers the CTI effects well.*
+[^1]: We examined the different ranges of CTI durations in two pilot experiments (Experiments S1 & 2 in the online supplement) in three of the five experimental blocks (i.e. the Pro, Anti, and Random Saccade blocks). The results of these two experiments suggested that a range from 50 to 400 ms covers the CTI effects well.
 
 ## Trial Procedure
 
@@ -147,12 +153,12 @@ To incorporate the theoretical assumptions outlined in the introduction, we spec
 2.  automatic activation of the cue could be filtered out over time. This was implemented with an exponential decay function, reflecting that a certain proportion of cue activation gets filtered over time. The higher this filtering $f$, the better a person is to re-actively control attention and reduce activation from the cue over time.[^2]
 3.  informative associations of cues to the target locations (in the Pro- and Anti-Saccade Block) could be used to improve performance over time. This binding activation $A_{binding}$ reflects a persons ability to use the association of the cued location to the target location to endogenously direct attention towards the cued location and improve the performance. We assumed that this process unfolds linearly with longer CTI duration.
 
-[^2]: *We chose to implement filtering this way, as two pilot experiments (Experiment S3 & 4 in the online supplement) have shown that participants only disengage attention from the cued location in the Random Saccade block, to redirect it towards the center of the screen, instead of entirely removing the cued location from the potential candidate positions the target could appear in. The latter could have resulted in a benefit for the Random Saccade Block over longer CTIs compared to the Central Saccade block, whereas the former only reduced the Cue Activiation down to the baseline level that we measure in the Central Saccade Block.*
+[^2]: We chose to implement filtering this way, as two pilot experiments (Experiment S3 & 4 in the online supplement) have shown that participants only disengage attention from the cued location in the Random Saccade block, to redirect it towards the center of the screen, instead of entirely removing the cued location from the potential candidate positions the target could appear in. The latter could have resulted in a benefit for the Random Saccade Block over longer CTIs compared to the Central Saccade block, whereas the former only reduced the Cue Activation down to the baseline level that we measure in the Central Saccade Block.
 
 Formally, this resulted in the following model:
 
 $$
-p_{correct} = Baseline - A_{cue} * e^{-f*CTI} + A_{binding} * CTI
+p_{correct} = PercSpeed - A_{cue} * e^{-f*CTI} + A_{binding} * CTI
 $$
 
 For an illustration of these theoretically informed processes, see @fig-theory. Specifically, the black line represents baseline performance independent of the above mentioned processes, that is performance in the Random Saccade Block. The differences at time 0 between the black and the red line represents the automatic activation of the cue, that declines exponentially towards the black line with time. The green line represents the use of binding information over time that improves performance with longer CTI duration. As this model was implemented on the logit-scale, the increases in performance on the probability scale are non-linear for binding benefits as a result of the logit link function.
@@ -161,8 +167,8 @@ For an illustration of these theoretically informed processes, see @fig-theory. 
 #| label: fig-theory
 #| fig-cap: "Illustration of the theoretically assumed processes and how they are affected by time."
 #| fig-subcap:
-#|   - "Probability Scale"
-#|   - "Logit Scale" 
+#|   - "Logit Scale"
+#|   - "Probability Scale" 
 #| layout-ncol: 2
 expDecay <- function(x, ActCue, filterSpeed, Baseline, scale = "prob") {
   y <- Baseline - ActCue * exp(-filterSpeed*x)
@@ -238,126 +244,170 @@ model_sat <- bf(correct | trials(nTrials) ~
                   # random effects
                   (0 + Block + Block:CTI_num | ID))
 
-model_th_full <- bf(correct | trials(nTrials) ~ Baseline - 
-                      inhibition * (ActCue * exp(-exp(filterSpeed)*CTI_num)) + 
+model_th_full <- bf(correct | trials(nTrials) ~ PercSpeed - 
+                      inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
                       binding * (bindingAct * CTI_num) +
-                      SaccadeFromCue * Reflexive +
-                      SaccadeFromFixation * Saccade,
-                    Baseline ~ 1 + (1 |r| ID),
-                    Reflexive ~ 1 + (1 |r| ID),
-                    Saccade ~ 1 + (1 |r| ID),
-                    ActCue ~ 1 + (1 |r| ID),
-                    filterSpeed ~ 1 + (1 |r| ID),
-                    bindingAct ~ 1 + (1 |r| ID),
+                      bottomup * capture +
+                      saccade * saccReq +
+                      goalMain * FixDur_num,
+                    PercSpeed  ~ 1 + (1 | r | ID),
+                    goalMain   ~ 1 + (1 | r | ID),
+                    capture    ~ 1 + (1 | r | ID),
+                    saccReq    ~ 1 + (1 | r | ID),
+                    InhibPro   ~ 1 + (1 | r | ID),
+                    InhibReac  ~ 1 + (1 | r | ID),
+                    bindingAct ~ 1 + (1 | r | ID),
                     nl = TRUE)
 
-model_th_noBaseSD <- bf(correct | trials(nTrials) ~ Baseline - 
-                      inhibition * (ActCue * exp(-exp(filterSpeed)*CTI_num)) + 
-                      binding * (bindingAct * CTI_num) +
-                      SaccadeFromCue * Reflexive +
-                      SaccadeFromFixation * Saccade,
-                    Baseline ~ 1,
-                    Reflexive ~ 1 + (1 |r| ID),
-                    Saccade ~ 1 + (1 |r| ID),
-                    ActCue ~ 1 + (1 |r| ID),
-                    filterSpeed ~ 1 + (1 |r| ID),
-                    bindingAct ~ 1 + (1 |r| ID),
-                    nl = TRUE)
+model_th_noPercSD <- bf(correct | trials(nTrials) ~ PercSpeed - 
+                          inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                          binding * (bindingAct * CTI_num) +
+                          bottomup * capture +
+                          saccade * saccReq +
+                          goalMain * FixDur_num,
+                        PercSpeed  ~ 1,
+                        goalMain   ~ 1 + (1 | r | ID),
+                        capture    ~ 1 + (1 | r | ID),
+                        saccReq    ~ 1 + (1 | r | ID),
+                        InhibPro   ~ 1 + (1 | r | ID),
+                        InhibReac  ~ 1 + (1 | r | ID),
+                        bindingAct ~ 1 + (1 | r | ID),
+                        nl = TRUE)
 
-model_th_noSfCSD <- bf(correct | trials(nTrials) ~ Baseline - 
-                      inhibition * (ActCue * exp(-exp(filterSpeed)*CTI_num)) + 
-                      binding * (bindingAct * CTI_num) +
-                      SaccadeFromCue * Reflexive +
-                      SaccadeFromFixation * Saccade,
-                    Baseline ~ 1 + (1 |r| ID),
-                    Reflexive ~ 1,
-                    Saccade ~ 1 + (1 |r| ID),
-                    ActCue ~ 1 + (1 |r| ID),
-                    filterSpeed ~ 1 + (1 |r| ID),
-                    bindingAct ~ 1 + (1 |r| ID),
-                    nl = TRUE)
+model_th_noGoalSD <- bf(correct | trials(nTrials) ~ PercSpeed - 
+                          inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                          binding * (bindingAct * CTI_num) +
+                          bottomup * capture +
+                          saccade * saccReq +
+                          goalMain * FixDur_num,
+                        PercSpeed  ~ 1 + (1 | r | ID),
+                        goalMain   ~ 1,
+                        capture    ~ 1 + (1 | r | ID),
+                        saccReq    ~ 1 + (1 | r | ID),
+                        InhibPro   ~ 1 + (1 | r | ID),
+                        InhibReac  ~ 1 + (1 | r | ID),
+                        bindingAct ~ 1 + (1 | r | ID),
+                        nl = TRUE)
 
-model_th_noSfFSD <- bf(correct | trials(nTrials) ~ Baseline - 
-                      inhibition * (ActCue * exp(-exp(filterSpeed)*CTI_num)) + 
-                      binding * (bindingAct * CTI_num) +
-                      SaccadeFromCue * Reflexive +
-                      SaccadeFromFixation * Saccade,
-                    Baseline ~ 1 + (1 |r| ID),
-                    Reflexive ~ 1 + (1 |r| ID),
-                    Saccade ~ 1,
-                    ActCue ~ 1 + (1 |r| ID),
-                    filterSpeed ~ 1 + (1 |r| ID),
-                    bindingAct ~ 1 + (1 |r| ID),
-                    nl = TRUE)
+model_th_noCapSD <- bf(correct | trials(nTrials) ~ PercSpeed - 
+                         inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                         binding * (bindingAct * CTI_num) +
+                         bottomup * capture +
+                         saccade * saccReq +
+                         goalMain * FixDur_num,
+                       PercSpeed  ~ 1 + (1 | r | ID),
+                       goalMain   ~ 1 + (1 | r | ID),
+                       capture    ~ 1,
+                       saccReq    ~ 1 + (1 | r | ID),
+                       InhibPro   ~ 1 + (1 | r | ID),
+                       InhibReac  ~ 1 + (1 | r | ID),
+                       bindingAct ~ 1 + (1 | r | ID),
+                       nl = TRUE)
 
-model_th_noAcSD <- bf(correct | trials(nTrials) ~ Baseline - 
-                      inhibition * (ActCue * exp(-exp(filterSpeed)*CTI_num)) + 
-                      binding * (bindingAct * CTI_num) +
-                      SaccadeFromCue * Reflexive +
-                      SaccadeFromFixation * Saccade,
-                    Baseline ~ 1 + (1 |r| ID),
-                    Reflexive ~ 1 + (1 |r| ID),
-                    Saccade ~ 1 + (1 |r| ID),
-                    ActCue ~ 1,
-                    filterSpeed ~ 1 + (1 |r| ID),
-                    bindingAct ~ 1 + (1 |r| ID),
-                    nl = TRUE)
+model_th_noSacSD <- bf(correct | trials(nTrials) ~ PercSpeed - 
+                         inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                         binding * (bindingAct * CTI_num) +
+                         bottomup * capture +
+                         saccade * saccReq +
+                         goalMain * FixDur_num,
+                       PercSpeed  ~ 1 + (1 | r | ID),
+                       goalMain   ~ 1 + (1 | r | ID),
+                       capture    ~ 1 + (1 | r | ID),
+                       saccReq    ~ 1,
+                       InhibPro   ~ 1 + (1 | r | ID),
+                       InhibReac  ~ 1 + (1 | r | ID),
+                       bindingAct ~ 1 + (1 | r | ID),
+                       nl = TRUE)
 
-model_th_noFSD <- bf(correct | trials(nTrials) ~ Baseline - 
-                      inhibition * (ActCue * exp(-exp(filterSpeed)*CTI_num)) + 
-                      binding * (bindingAct * CTI_num) +
-                      SaccadeFromCue * Reflexive +
-                      SaccadeFromFixation * Saccade,
-                    Baseline ~ 1 + (1 |r| ID),
-                    Reflexive ~ 1 + (1 |r| ID),
-                    Saccade ~ 1 + (1 |r| ID),
-                    ActCue ~ 1 + (1 |r| ID),
-                    filterSpeed ~ 1,
-                    bindingAct ~ 1 + (1 |r| ID),
-                    nl = TRUE)
+model_th_noInhProSD <- bf(correct | trials(nTrials) ~ PercSpeed - 
+                            inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                            binding * (bindingAct * CTI_num) +
+                            bottomup * capture +
+                            saccade * saccReq +
+                            goalMain * FixDur_num,
+                          PercSpeed  ~ 1 + (1 | r | ID),
+                          goalMain   ~ 1 + (1 | r | ID),
+                          capture    ~ 1 + (1 | r | ID),
+                          saccReq    ~ 1 + (1 | r | ID),
+                          InhibPro   ~ 1,
+                          InhibReac  ~ 1 + (1 | r | ID),
+                          bindingAct ~ 1 + (1 | r | ID),
+                          nl = TRUE)
 
-model_th_noBindSD <- bf(correct | trials(nTrials) ~ Baseline - 
-                      inhibition * (ActCue * exp(-exp(filterSpeed)*CTI_num)) + 
-                      binding * (bindingAct * CTI_num) +
-                      SaccadeFromCue * Reflexive +
-                      SaccadeFromFixation * Saccade,
-                    Baseline ~ 1 + (1 |r| ID),
-                    Reflexive ~ 1 + (1 |r| ID),
-                    Saccade ~ 1 + (1 |r| ID),
-                    ActCue ~ 1 + (1 |r| ID),
-                    filterSpeed ~ 1 + (1 |r| ID),
-                    bindingAct ~ 1,
-                    nl = TRUE)
+model_th_noInhReSD <- bf(correct | trials(nTrials) ~ PercSpeed - 
+                           inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                           binding * (bindingAct * CTI_num) +
+                           bottomup * capture +
+                           saccade * saccReq +
+                           goalMain * FixDur_num,
+                         PercSpeed  ~ 1 + (1 | r | ID),
+                         goalMain   ~ 1 + (1 | r | ID),
+                         capture    ~ 1 + (1 | r | ID),
+                         saccReq    ~ 1 + (1 | r | ID),
+                         InhibPro   ~ 1 + (1 | r | ID),
+                         InhibReac  ~ 1,
+                         bindingAct ~ 1 + (1 | r | ID),
+                         nl = TRUE)
 
-model_th_reduced <- bf(correct | trials(nTrials) ~ Baseline - 
-                      inhibition * (ActCue * exp(-exp(filterSpeed)*CTI_num)) + 
-                      binding * (bindingAct * CTI_num) +
-                      SaccadeFromCue * Reflexive +
-                      SaccadeFromFixation * Saccade,
-                    Baseline ~ 1 + (1 |r| ID),
-                    Reflexive ~ 1 + (1 |r| ID),
-                    Saccade ~ 1 + (1 |r| ID),
-                    ActCue ~ 1 + (1 |r| ID),
-                    filterSpeed ~ 1,
-                    bindingAct ~ 1 + (1 |r| ID),
-                    nl = TRUE)
+model_th_noBindSD <- bf(correct | trials(nTrials) ~ PercSpeed - 
+                          inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                          binding * (bindingAct * CTI_num) +
+                          bottomup * capture +
+                          saccade * saccReq +
+                          goalMain * FixDur_num,
+                        PercSpeed  ~ 1 + (1 | r | ID),
+                        goalMain   ~ 1 + (1 | r | ID),
+                        capture    ~ 1 + (1 | r | ID),
+                        saccReq    ~ 1 + (1 | r | ID),
+                        InhibPro   ~ 1 + (1 | r | ID),
+                        InhibReac  ~ 1 + (1 | r | ID),
+                        bindingAct ~ 1,
+                        nl = TRUE)
+
+model_th_reduced <- bf(correct | trials(nTrials) ~ PercSpeed - 
+                         inhibition * (InhibPro * exp(-InhibReac*CTI_num)) + 
+                         binding * (bindingAct * CTI_num) +
+                         bottomup * capture +
+                         saccade * saccReq +
+                         goalMain * FixDur_num,
+                       PercSpeed  ~ 1 + (1 | r | ID),
+                       goalMain   ~ 1 + (1 | r | ID),
+                       capture    ~ 1 + (1 | r | ID),
+                       saccReq    ~ 1 + (1 | r | ID),
+                       InhibPro   ~ 1 + (1 | r | ID),
+                       InhibReac  ~ 1,
+                       bindingAct ~ 1 + (1 | r | ID),
+                       nl = TRUE)
+
+all_model_formulas <- list(saturated = model_sat, 
+                           th_full = model_th_full, 
+                           noPercSD = model_th_noPercSD, 
+                           noGoalSD = model_th_noGoalSD, 
+                           noCapSD = model_th_noCapSD, 
+                           noSacSD = model_th_noSacSD, 
+                           noInhProSD =model_th_noInhProSD, 
+                           noInhReSD = model_th_noInhReSD, 
+                           noBindSD = model_th_noBindSD, 
+                           reduced = model_th_reduced)
 ```
 
-For all model parameters, we used moderately informative logistic priors centered on zero with a scale of 1/2. Parameters were estimated with four independent MCMC chains retaining 10000 samples for each chain after 2000 warm-up samples.
+For all model parameters, we used moderately informative normal priors centered on zero with a standard deviation of one. Parameters were estimated with four independent MCMC chains retaining 10000 samples for each chain after 2000 warm-up samples.
 
 ```{r Priors}
 sat_priors <- prior("logistic(0,1)", class = b)
-theoretical_priors <- prior("normal(0,1)", class = b, nlpar = Baseline) +
-  prior("normal(0,1)", class = b, nlpar = Reflexive) +
-  prior("normal(0,1)", class = b, nlpar = Saccade) +
-  prior("normal(0,1)", class = b, nlpar = ActCue) +
-  prior("normal(0,1)", class = b, nlpar = filterSpeed) +
+theoretical_priors <- prior("normal(0,1)", class = b, nlpar = PercSpeed) +
+  prior("normal(0,1)", class = b, nlpar = goalMain) +
+  prior("normal(0,1)", class = b, nlpar = capture) +
+  prior("normal(0,1)", class = b, nlpar = saccReq) +
+  prior("normal(0,1)", class = b, nlpar = InhibPro) +
+  prior("normal(0,1)", class = b, nlpar = InhibReac) +
   prior("normal(0,1)", class = b, nlpar = bindingAct)
-theoretical_priors_reduced <- prior("normal(0,1)", class = b, nlpar = Baseline) +
-  prior("normal(0,1)", class = b, nlpar = Reflexive) +
-  prior("normal(0,1)", class = b, nlpar = Saccade) +
-  prior("normal(0,1)", class = b, nlpar = ActCue) +
-  prior("constant(0)", class = b, nlpar = filterSpeed) +
+theoretical_priors_reduced <- prior("normal(0,1)", class = b, nlpar = PercSpeed) +
+  prior("normal(0,1)", class = b, nlpar = goalMain) +
+  prior("normal(0,1)", class = b, nlpar = capture) +
+  prior("normal(0,1)", class = b, nlpar = saccReq) +
+  prior("normal(0,1)", class = b, nlpar = InhibPro) +
+  prior("constant(0)", class = b, nlpar = InhibReac) +
   prior("normal(0,1)", class = b, nlpar = bindingAct)
 ```
 
@@ -372,25 +422,48 @@ postwarmup_samples <- 10000
 ## Descriptive Statistics
 
 ```{r TableDesc}
-#| label: tbl-descriptives
+#| label: tbl-descriptivesCTI
 #| tab-cap: "Desciptive statistiscs for the proportion correct in the different experimental conditions and each CTI condition."
-table_data <- agg_data %>% 
+table_CTI <- agg_data %>% 
   group_by(Block, CTI) %>% 
   summarise(Mean = mean(correct/nTrials),
             SD = sd(correct/nTrials),
             Min = min(correct/nTrials),
             Max = max(correct/nTrials),
             .groups = "drop")
-table_data[,3:6] <- round(table_data[,3:6],2)
-knitr::kable(table_data)
+table_CTI[,3:6] <- round(table_CTI[,3:6],2)
+
+knitr::kable(table_CTI)
 ```
 
-The summary statistics for the Proportion of correct responses in the five different blocks for all CTI durations are given in @tbl-descriptives. @fig-descriptive displays the average performance across the different conditions and includes performance of each subject in each of the conditions.
+```{r TableDesc}
+#| label: tbl-descriptivesFixDur
+#| tab-cap: "Desciptive statistiscs for the proportion correct in the different experimental conditions and each Fixation duration condition."
+table_FixDur <- agg_data %>% 
+  group_by(Block, FixDur) %>% 
+  summarise(Mean = mean(correct/nTrials),
+            SD = sd(correct/nTrials),
+            Min = min(correct/nTrials),
+            Max = max(correct/nTrials),
+            .groups = "drop")
+table_FixDur[,3:6] <- round(table_FixDur[,3:6],2)
+knitr::kable(table_FixDur)
+```
+
+The summary statistics for the Proportion of correct responses in the five different blocks for all CTI durations are given in @tbl-descriptivesCTI and @tbl-descriptivesFixDur. @fig-descriptive displays the average performance across the different conditions and includes performance of each subject in each of the conditions.
 
 ```{r FigDesc, echo=FALSE}
-desc_plot <- ggplot(data = agg_data,
+plot_data <- data %>%
+  dplyr::group_by(ID, Block, bottomup, saccade, inhibition, binding, CTI, CTI_num) %>%
+  dplyr::summarise(
+    correct = sum(correct),
+    nTrials = dplyr::n(),
+    .groups = "drop"
+  )
+
+desc_plot <- ggplot(data = plot_data,
                     aes(x = as.factor(CTI_num*100), y = correct/nTrials, color = as.factor(Block), fill = as.factor(Block), 
-                        group = as.factor(Block), shape = as.factor(SaccadeFromCue))) +
+                        group = as.factor(Block), shape = as.factor(bottomup))) +
   facet_grid(inhibition ~ binding, labeller = label_both) +
   ggplot2::geom_jitter(position = ggplot2::position_jitterdodge(jitter.width = jitter_width, dodge.width = plot_dodge),
                        alpha = point_alpha) +
@@ -402,173 +475,84 @@ desc_plot <- ggplot(data = agg_data,
        color = "Block", fill = "Block",
        shape = "Pos Cue = Target",
        title = "Descriptive Plot") +
-  coord_cartesian(ylim = c(0,1))
-ggsave(filename = "E5_Descriptives.jpg",desc_plot, dpi = 300, width = 7, height = 6)
+  coord_cartesian(ylim = c(0,1)) +
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank())
+ggsave(filename = "figures_E1/E1_Descriptives.jpg",desc_plot, dpi = 300, width = 7, height = 6)
 ```
 
-![Average performance in the different experimental blocks for different CTI durations.](E5_Descriptives.jpg){#fig-descriptive}
+![Average performance in the different experimental blocks for different CTI durations.](figures_E1/E1_Descriptives.jpg){#fig-descriptive}
 
 ## GLM: Accuracy
 
 ```{r FitModel}
-fit_E5_sat <- brms::brm(model_sat,
-                        data = agg_data,
-                        family = model_family,
-                        backend = "cmdstanr",
-                        chains = nChains,
-                        iter = warmup_samples + postwarmup_samples, 
-                        warmup = warmup_samples,
-                        prior = sat_priors,
-                        save_pars = save_pars(all = T),
-                        sample_prior = T,
-                        file = "fit_Exp5_sat",
-                        file_refit = "on_change")
-
-fit_E5_th_full <- brms::brm(model_th_full,
-                            data = agg_data,
-                            family = model_family,
-                            backend = "cmdstanr",
-                            chains = nChains,
-                            iter = warmup_samples + postwarmup_samples, 
-                            warmup = warmup_samples,
-                            prior = theoretical_priors,
-                            save_pars = save_pars(all = T),
-                            sample_prior = T,
-                            file = "fit_Exp5_th_full",
-                            file_refit = "on_change")
-
-fit_E5_th_full_prior <- brms::brm(model_th_full,
+fitted_models <- list()
+marginalLL <- list()
+for(i in 1:length(all_model_formulas)) {
+  model_name <- names(all_model_formulas)[i]
+  model_formula = all_model_formulas[[i]]
+  
+  if (model_name == "saturated") {
+    priors <- sat_priors
+  } else if(model_name == "reduced") {
+    priors <- theoretical_priors_reduced
+  } else {
+    priors <- theoretical_priors
+  }
+  
+  fitted_models[[i]] <- brms::brm(model_formula,
                                   data = agg_data,
                                   family = model_family,
                                   backend = "cmdstanr",
                                   chains = nChains,
                                   iter = warmup_samples + postwarmup_samples, 
                                   warmup = warmup_samples,
-                                  prior = theoretical_priors,
+                                  prior = priors,
                                   save_pars = save_pars(all = T),
-                                  sample_prior = "only",
-                                  file = "fit_Exp5_th_full_priors",
+                                  file = paste0("modelFits_E1/fit_E1_", model_name),
                                   file_refit = "on_change")
+  
+  if (!file.exists(paste("modelFits_E1/bridge_E1_", model_name, ".rds", sep = ""))) {
+    bridge <- bridge_sampler(fitted_models[[i]], cores = 4, repetitions = 10)
+    saveRDS(bridge, paste("modelFits_E1/bridge_E1_", model_name, ".rds", sep = ""))
+  } else {
+    bridge <- readRDS(paste("modelFits_E1/bridge_E1_", model_name, ".rds", sep = ""))
+  }
+  
+  marginalLL[[i]] <- bridge
+}
+
+prior_models <- list()
+for(i in 1:length(all_model_formulas)) {
+  model_name <- names(all_model_formulas)[i]
+  model_formula = all_model_formulas[[i]]
+  
+  if (model_name == "saturated") {
+    priors <- sat_priors
+  } else if(model_name == "reduced") {
+    priors <- theoretical_priors_reduced
+  } else {
+    priors <- theoretical_priors
+  }
+  
+  prior_models[[i]] <- brms::brm(model_formula,
+                                 data = agg_data,
+                                 family = model_family,
+                                 backend = "cmdstanr",
+                                 chains = nChains,
+                                 iter = warmup_samples + postwarmup_samples, 
+                                 warmup = warmup_samples,
+                                 prior = priors,
+                                 sample_prior = "only",
+                                 save_pars = save_pars(all = T),
+                                 file = paste0("modelFits_E1/fit_E1_", model_name,"_priors"),
+                                 file_refit = "on_change")
+}
 
 
 # Test if parameters differ from zero
 bf_pars <- bayestestR::bayesfactor_parameters(fit_E5_th_full,
                                               prior = fit_E5_th_full_prior)
-
-# compute Bayes Factor for setting filter to zero
-if (!file.exists("bridge_marginalLL_Exp5.rds")) {
-  fit_E5_th_noBaseSD <- brms::brm(model_th_noBaseSD,
-                                  data = agg_data,
-                                  family = model_family,
-                                  backend = "cmdstanr",
-                                  chains = nChains,
-                                  iter = warmup_samples + postwarmup_samples, 
-                                  warmup = warmup_samples,
-                                  prior = theoretical_priors,
-                                  save_pars = save_pars(all = T),
-                                  sample_prior = T,
-                                  file = "fit_Exp5_th_noBaseSD",
-                                  file_refit = "on_change")
-  
-  fit_E5_th_noSfCSD <- brms::brm(model_th_noSfCSD,
-                                 data = agg_data,
-                                 family = model_family,
-                                 backend = "cmdstanr",
-                                 chains = nChains,
-                                 iter = warmup_samples + postwarmup_samples, 
-                                 warmup = warmup_samples,
-                                 prior = theoretical_priors,
-                                 save_pars = save_pars(all = T),
-                                 sample_prior = T,
-                                 file = "fit_Exp5_th_noSfCSD",
-                                 file_refit = "on_change")
-  
-  fit_E5_th_noSfFSD <- brms::brm(model_th_noSfFSD,
-                                 data = agg_data,
-                                 family = model_family,
-                                 backend = "cmdstanr",
-                                 chains = nChains,
-                                 iter = warmup_samples + postwarmup_samples, 
-                                 warmup = warmup_samples,
-                                 prior = theoretical_priors,
-                                 save_pars = save_pars(all = T),
-                                 sample_prior = T,
-                                 file = "fit_Exp5_th_noSfFSD",
-                                 file_refit = "on_change")
-  
-  fit_E5_th_noAcSD <- brms::brm(model_th_noAcSD,
-                                data = agg_data,
-                                family = model_family,
-                                backend = "cmdstanr",
-                                chains = nChains,
-                                iter = warmup_samples + postwarmup_samples, 
-                                warmup = warmup_samples,
-                                prior = theoretical_priors,
-                                save_pars = save_pars(all = T),
-                                sample_prior = T,
-                                file = "fit_Exp5_th_noAcSD",
-                                file_refit = "on_change")
-  
-  fit_E5_th_noFSD <- brms::brm(model_th_noFSD,
-                               data = agg_data,
-                               family = model_family,
-                               backend = "cmdstanr",
-                               chains = nChains,
-                               iter = warmup_samples + postwarmup_samples, 
-                               warmup = warmup_samples,
-                               prior = theoretical_priors,
-                               save_pars = save_pars(all = T),
-                               sample_prior = T,
-                               file = "fit_Exp5_th_noFSD",
-                               file_refit = "on_change")
-  
-  fit_E5_th_noBindSD <- brms::brm(model_th_noBindSD,
-                                  data = agg_data,
-                                  family = model_family,
-                                  backend = "cmdstanr",
-                                  chains = nChains,
-                                  iter = warmup_samples + postwarmup_samples, 
-                                  warmup = warmup_samples,
-                                  prior = theoretical_priors,
-                                  save_pars = save_pars(all = T),
-                                  sample_prior = T,
-                                  file = "fit_Exp5_th_noBindSD",
-                                  file_refit = "on_change")
-  
-  fit_E5_th_reduced <- brms::brm(model_th_reduced,
-                                 data = agg_data,
-                                 family = model_family,
-                                 backend = "cmdstanr",
-                                 chains = nChains,
-                                 iter = warmup_samples + postwarmup_samples, 
-                                 warmup = warmup_samples,
-                                 prior = theoretical_priors_reduced,
-                                 save_pars = save_pars(all = T),
-                                 sample_prior = T,
-                                 file = "fit_Exp5_th_reduced",
-                                 file_refit = "on_change")
-  
-  bridge_full <- bridge_sampler(fit_E5_th_full, cores = 4, repetitions = 10)
-  bridge_reduced <- bridge_sampler(fit_E5_th_reduced, cores = 4, repetitions = 10)
-  bridge_noBaseSD <- bridge_sampler(fit_E5_th_noBaseSD, cores = 4, repetitions = 10)
-  bridge_noSfCSD<- bridge_sampler(fit_E5_th_noSfCSD, cores = 4, repetitions = 10)
-  bridge_noSfFSD <- bridge_sampler(fit_E5_th_noSfFSD, cores = 4, repetitions = 10)
-  bridge_noAcSD <- bridge_sampler(fit_E5_th_noAcSD, cores = 4, repetitions = 10)
-  bridge_noFSD <- bridge_sampler(fit_E5_th_noFSD, cores = 4, repetitions = 10)
-  bridge_noBindSD <- bridge_sampler(fit_E5_th_noBindSD, cores = 4, repetitions = 10)
-  
-  marginalLL <- list(full = bridge_full,
-                     reduced = bridge_reduced,
-                     noBaseSD = bridge_noBaseSD,
-                     noSfCSD = bridge_noSfCSD,
-                     noSfFSD = bridge_noSfFSD,
-                     noAcSD = bridge_noAcSD,
-                     noFSD = bridge_noFSD,
-                     noBindSD = bridge_noBindSD)
-  saveRDS(marginalLL, "bridge_marginalLL_Exp5.rds")
-} else {
-  marginalLL <- readRDS("bridge_marginalLL_Exp5.rds")
-}
 
 # test if there is evidence for filtering
 bf_filter <- bayes_factor(marginalLL$full, marginalLL$reduced)
@@ -654,19 +638,17 @@ ggsave(filename = "PostPredictives_Theoretical_E5.jpg",pp_plot_theoretical, dpi 
 gc()
 ```
 
-
 ### Experimental Effects
 
 ![Posterior predictives of the average proportion correct as a function of CTI duration. The black crosses indicate the observed average proportion correct based on the data.](PostPredictives_Theoretical_E5.jpg){#fig-predictive}
 
-@fig-predictive shows the posterior predictive estimates from the Bayesian GLM for the different experimental blocks and the changes in performance across the different CTI levels on the proportion correct scale. The theoretical model fits adequately to the observed data, as indicated by the black crosses in the plot.
+@fig-predictive shows the posterior predictive estimates from the Bayesian GLM for the different experimental blocks and the changes in performance across the different CTI levels on the proportion correct scale. The theoretical model fits adequately to the observed data, as indicated by the black crosses in the plot that closely overlay with the posterior means estimated from the GLM.
 
-First, we evaluated if there was evidence for the different theoretical assumed processes contributing to performance in the manual Anti-Saccade task. The results indicated that there was credible automatic activation of cues, $b_{Acue} = `r fixFX["ActCue_Intercept","Estimate"]`$, 95% CI = $[`r fixFX["ActCue_Intercept","Q2.5"]`;`r fixFX["ActCue_Intercept","Q97.5"]`]$, $BF_{10} =$ `r printnum(exp(bf_pars[which(bf_pars[,"Parameter"] == "b_ActCue_Intercept"),"log_BF"]), format = "g")`, which weakened with longer CTI duration, $b_{filter} = `r round(exp(fixFX["filterSpeed_Intercept","Estimate"]),2)`$, 95% CI = $[`r exp(fixFX["filterSpeed_Intercept","Q2.5"])`;`r exp(fixFX["filterSpeed_Intercept","Q97.5"])`]$, $BF_{10} =$ `r printnum( bf_filter[["bf_median_based"]], format = "g")`. Likewise, an informative association of the cue to the location of the target location improved performance with longer CTI duration, $b_{binding} = `r fixFX["bindingAct_Intercept","Estimate"]`$, 95% CI = $[`r fixFX["bindingAct_Intercept","Q2.5"]`;`r fixFX["bindingAct_Intercept","Q97.5"]`]$, $BF_{10} =$ `r printnum(exp(bf_pars[which(bf_pars[,"Parameter"] == "b_bindingAct_Intercept"),"log_BF"]), format = "g")`. In addition, both having to perform a saccade away from fixation, $b_{SfF} = `r fixFX["Baseline_SaccadeFromFixation1","Estimate"]`$, 95% CI = $[`r fixFX["Baseline_SaccadeFromFixation1","Q2.5"]`;`r fixFX["Baseline_SaccadeFromFixation1","Q97.5"]`]$, $BF_{10} =$ `r printnum(exp(bf_pars[which(bf_pars[,"Parameter"] == "b_Baseline_SaccadeFromFixation1"),"log_BF"]), format = "g")`, and a saccade away from the cue, $b_{SfC} = `r fixFX["Baseline_SaccadeFromCue2","Estimate"]`$, 95% CI = $[`r fixFX["Baseline_SaccadeFromCue2","Q2.5"]`;`r fixFX["Baseline_SaccadeFromCue2","Q97.5"]`]$, $BF_{10} =$ `r printnum(exp(bf_pars[which(bf_pars[,"Parameter"] == "b_Baseline_SaccadeFromCue2"),"log_BF"]), format = "g")`, resulted in worse performance. A summary of parameter estimates is displayed in @tbl-parameters.
+First, we evaluated if there was evidence for the different theoretically assumed processes contributing to performance in the manual Anti-Saccade task. The results indicated that there was credible automatic activation of cues, $b_{Acue} = `r fixFX["ActCue_Intercept","Estimate"]`$, 95% CI = $[`r fixFX["ActCue_Intercept","Q2.5"]`;`r fixFX["ActCue_Intercept","Q97.5"]`]$, $BF_{10} =$ `r printnum(exp(bf_pars[which(bf_pars[,"Parameter"] == "b_ActCue_Intercept"),"log_BF"]), format = "g")`, which weakened with longer CTI duration, $b_{filter} = `r round(exp(fixFX["filterSpeed_Intercept","Estimate"]),2)`$, 95% CI = $[`r exp(fixFX["filterSpeed_Intercept","Q2.5"])`;`r exp(fixFX["filterSpeed_Intercept","Q97.5"])`]$, $BF_{10} =$ `r printnum( bf_filter[["bf_median_based"]], format = "g")`. Likewise, an informative association of the cue to the location of the target location improved performance with longer CTI duration, $b_{binding} = `r fixFX["bindingAct_Intercept","Estimate"]`$, 95% CI = $[`r fixFX["bindingAct_Intercept","Q2.5"]`;`r fixFX["bindingAct_Intercept","Q97.5"]`]$, $BF_{10} =$ `r printnum(exp(bf_pars[which(bf_pars[,"Parameter"] == "b_bindingAct_Intercept"),"log_BF"]), format = "g")`. In addition, both having to perform a saccade, $b_{saccade} = `r fixFX["Saccade_Intercept","Estimate"]`$, 95% CI = $[`r fixFX["Saccade_Intercept","Q2.5"]`;`r fixFX["Saccade_Intercept","Q97.5"]`]$, $BF_{10} =$ `r printnum(exp(bf_pars[which(bf_pars[,"Parameter"] == "b_Saccade_Intercept"),"log_BF"]), format = "g")`, and the benefit of the reflexive saccade to the cue already indicating the target location, $b_{reflexive} = `r fixFX["Reflexive_Intercept","Estimate"]`$, 95% CI = $[`r fixFX["Reflexive_Intercept","Q2.5"]`;`r fixFX["Reflexive_Intercept","Q97.5"]`]$, $BF_{10} =$ `r printnum(exp(bf_pars[which(bf_pars[,"Parameter"] == "b_Reflexive_Intercept"),"log_BF"]), format = "g")`, resulted in worse performance. A summary of parameter estimates is displayed in @tbl-parameters.
 
 ```{r ParTable}
 #| label: tbl-parameters
 #| tab-cap: "Overview of parameter estimates"
-fixFX <- fixef(fit_E5_th_full)
 rownames(fixFX) <- stringr::str_remove(rownames(fixFX), "_Intercept")
 fixFX["filterSpeed",]<- exp(fixFX["filterSpeed",])
 knitr::kable(fixFX[,c("Estimate","Q2.5","Q97.5")], digits = 2)
@@ -699,26 +681,7 @@ knitr::kable(df_bf_SD, digits = 2)
 
 As the manual Anti-Saccade task is commonly used in individual differences research to measure how people differ in their ability to control attention and how this is related to other cognitive abilities, we also tested if there are credible individual differences in the processes we dissociated in our model. We did so by selectively fixing the random effect of one of the processes to zero and test if this model was favored over a model freely estimating the random effect. These analyses indicated that there was credible evidence for individual differences in all processes separated in the model (see @tbl-bfSD).
 
-```{r}
-SD_hypothesis <- c(
-  BaseVSfF = "Baseline_Intercept = Reflexive_Intercept",
-  BaseVSfC = "Baseline_Intercept = Saccade_Intercept",
-  BaseVAc = "Baseline_Intercept = ActCue_Intercept",
-  BaseVBind = "Baseline_Intercept = bindingAct_Intercept",
-  SfFVSfC = "Reflexive_Intercept = Saccade_Intercept",
-  SfFVAc = "Reflexive_Intercept = ActCue_Intercept",
-  SfFVBind = "Reflexive_Intercept = bindingAct_Intercept",
-  SfCVAc = "Saccade_Intercept = ActCue_Intercept",
-  SfCVBind = "Saccade_Intercept = bindingAct_Intercept",
-  AcVBind = "ActCue_Intercept = bindingAct_Intercept"
-)
-
-hypSD <- hypothesis(fit_E5_th_full,
-                    SD_hypothesis,
-                    class = "sd", group = "ID")
-```
-
-We also estimated the correlations between all random effects. @tbl-correlations shows the estimated standard deviations of all random effects and the correlations among them. Generally, correlations between random effects were small, most $|r_s| < .30$, except for the correlation between the Intercept of Baseline performance and the cost of perforg a saccade away from the fixation, $r = -.59$, indicating that people that were good at discriminating the target letters overall exhibited larger cost for performing a saccade away from fixation. However, the generally small correlations indicate that our theoretical model is able to isolate different cognitive processes underlying performance in the manual Anti-Saccade tasks.
+We also estimated the correlations between all random effects. @tbl-correlations shows the estimated standard deviations of all random effects and the correlations among them. Generally, correlations between random effects were small, most $|r_s| < .30$, except for the correlation between the Intercept of Baseline performance and the cost of having to performing a saccade towards the target, $r = -.59$, indicating that people that were good at discriminating the target letters overall exhibited larger costs for performing a saccade. However, the generally small correlations indicate that our theoretical model is able to isolate different cognitive processes underlying performance in the manual Anti-Saccade tasks.
 
 ```{r CorrTable}
 #| label: tbl-correlations
@@ -739,11 +702,15 @@ cormat[upper.tri(cormat)] <- ""
 knitr::kable(cormat, digits = 2)
 ```
 
-@tbl-validity shows correlations between the random effects of processes separated in the GLM with the observed performance in the different experimental blocks. These correlations capture to what extend performance in one of the experimental blocks is a valid indicator for the processes. A process pure indicator would only correlate with one of the process measures. As is evident from the table, none of the experimental blocks is a truly process pure indicator for a single process. With respect to the typical use of the anti-saccade task (using a CTI of 50ms), it is measuring at least three processes: sensory discrimination, the speed of filtering automatic activation, and binding ability. Any correlation with external covariates can thus stem from a correlation with any of these processes. This renders the interpretation of the predictive power of performance in the anti-saccade task complex to interpret with respect to the processes that is responsible for it.
+### Validity of the Anti-Saccade Task
+
+Since its conception the anti-saccade task was used as a measure for the ability to inhibit automatic saccade. To test if this is true, we investigated how strongly performance in the difference experimental conditions was related to the processes we dissociated in the GLM. 
+
+@fig-validity shows correlations between the random effects of the processes separated in the GLM with the observed performance in the different experimental blocks. These correlations capture to what extend performance in one of the experimental blocks is a valid indicator for the processes. A process pure indicator would only correlate with one of the process measures. As is evident from the figure, none of the experimental blocks is a truly process pure indicator for a single process. With respect to the typical use of the anti-saccade task (using a CTI of 50ms), it is measuring at least three processes: sensory discrimination, the speed of filtering automatic activation, and binding ability. Any correlation with external covariates can thus stem from a correlation with any of these processes. This renders the interpretation of the predictive power of performance in the anti-saccade task complex to interpret with respect to the processes that is responsible for it.
 
 ```{r}
-#| label: tbl-validity
-#| tab-cap: "Correlations of the seperated processes with observed peformance in the different experimental blocks."
+#| label: fig-validity
+#| fig-cap: "Validity estimates of performance in the different conditions for the seperated processes."
 agg_data_validity <- agg_data %>% 
   mutate(pC = correct/nTrials) %>% 
   select(ID,Block,CTI,pC)
@@ -759,7 +726,7 @@ randFX_draws <- fit_E5_th_full %>%
 
 randFX_draws <- randFX_draws %>% 
   tidyr::pivot_wider(names_from = c(.variable),
-              values_from = .value)
+                     values_from = .value)
 
 df_validity = expand.grid(
   ID = unique(agg_data$ID),
@@ -774,14 +741,14 @@ df_validity = expand.grid(
 df_cor <- df_validity %>% 
   group_by(Block, CTI, .draw) %>% 
   summarise(
-    SensDisc = cor(pC, Baseline, use = "complete.obs"),
-    ActCue = cor(pC, ActCue, use = "complete.obs"),
-    Filter = cor(pC, filterSpeed, use = "complete.obs"),
+    SensoryDiscrimination = cor(pC, Baseline, use = "complete.obs"),
+    CueActivation = cor(pC, ActCue, use = "complete.obs"),
+    FilterSpeed = cor(pC, filterSpeed, use = "complete.obs"),
     Binding = cor(pC, bindingAct, use = "complete.obs"),
-    SaccCue = cor(pC, Reflexive, use = "complete.obs"),
-    SaccFix = cor(pC, Saccade, use = "complete.obs"),
-  .groups = "drop") %>% 
-  tidyr::pivot_longer(cols = c(SensDisc, ActCue, Filter, Binding, SaccCue, SaccFix)) %>% 
+    Reflexive = cor(pC, Reflexive, use = "complete.obs"),
+    Saccade = cor(pC, Saccade, use = "complete.obs"),
+    .groups = "drop") %>% 
+  tidyr::pivot_longer(cols = c(SensoryDiscrimination, CueActivation, FilterSpeed, Binding, Reflexive, Saccade)) %>% 
   group_by(Block, CTI, name) %>% 
   summarise(
     mean = mean(value),
@@ -789,34 +756,29 @@ df_cor <- df_validity %>%
     CIhigh = quantile(value, probs = 0.975)
   )
 
-df_cor$alpha = 1
 df_cor$process = "yes"
-df_cor[which(df_cor$name == "ActCue"),]$alpha <- ifelse(
-  df_cor[which(df_cor$name == "ActCue"),]$Block %in% inhib_blocks, 1, 0.5)
-df_cor[which(df_cor$name == "Filter"),]$alpha <- ifelse(
-  df_cor[which(df_cor$name == "Filter"),]$Block %in% inhib_blocks, 1, 0.5)
-df_cor[which(df_cor$name == "Binding"),]$alpha <- ifelse(
-  df_cor[which(df_cor$name == "Binding"),]$Block %in% bind_blocks, 1, 0.5)
-df_cor[which(df_cor$name == "SaccCue"),]$alpha <- ifelse(
-  df_cor[which(df_cor$name == "SaccCue"),]$Block %in% SaccadeFromCue, 0.5, 1)
-df_cor[which(df_cor$name == "SaccFix"),]$alpha <- ifelse(
-  df_cor[which(df_cor$name == "SaccFix"),]$Block %in% SaccadeFromFixation, 1, 0.5)
 
-df_cor[which(df_cor$name == "ActCue"),]$process <- ifelse(
-  df_cor[which(df_cor$name == "ActCue"),]$Block %in% inhib_blocks, "yes", "no")
-df_cor[which(df_cor$name == "Filter"),]$process <- ifelse(
-  df_cor[which(df_cor$name == "Filter"),]$Block %in% inhib_blocks, "yes", "no")
+df_cor[which(df_cor$name == "CueActivation"),]$process <- ifelse(
+  df_cor[which(df_cor$name == "CueActivation"),]$Block %in% inhib_blocks, "yes", "no")
+df_cor[which(df_cor$name == "FilterSpeed"),]$process <- ifelse(
+  df_cor[which(df_cor$name == "FilterSpeed"),]$Block %in% inhib_blocks, "yes", "no")
 df_cor[which(df_cor$name == "Binding"),]$process <- ifelse(
   df_cor[which(df_cor$name == "Binding"),]$Block %in% bind_blocks, "yes", "no")
-df_cor[which(df_cor$name == "SaccCue"),]$process <- ifelse(
-  df_cor[which(df_cor$name == "SaccCue"),]$Block %in% SaccadeFromCue, "no", "yes")
-df_cor[which(df_cor$name == "SaccFix"),]$process <- ifelse(
-  df_cor[which(df_cor$name == "SaccFix"),]$Block %in% SaccadeFromFixation, "yes", "no")
+df_cor[which(df_cor$name == "Reflexive"),]$process <- ifelse(
+  df_cor[which(df_cor$name == "Reflexive"),]$Block %in% SaccadeFromCue, "no", "yes")
+df_cor[which(df_cor$name == "Saccade"),]$process <- ifelse(
+  df_cor[which(df_cor$name == "Saccade"),]$Block %in% SaccadeFromFixation, "yes", "no")
 
-ggplot(data = df_cor,
-       aes(x = as.factor(CTI), y = mean, ymin = CIlow, ymax = CIhigh, color = Block, shape = process, alpha = as.factor(alpha))) +
-  geom_point(position = position_dodge(0.25)) +
-  geom_errorbar(width = 0, position = position_dodge(0.25)) +
+plot_validity <- ggplot(data = df_cor,
+                        aes(x = as.factor(CTI), y = mean, ymin = CIlow, ymax = CIhigh, color = Block, shape = process, alpha = process)) +
+  geom_point(position = position_dodge(0.5), size =2) +
+  geom_errorbar(width = 0, position = position_dodge(0.5), linewidth = 1) +
   facet_wrap(~name) +
-  geom_hline(yintercept = 0, color = "red", linetype = "dashed")
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  scale_alpha_discrete(range = c(1/3,1)) +
+  labs(x = "Cue-Target Interval", y = "Validity (Correlation: Process with Prop. Corr)",
+       shape = "Process\n included:", alpha = "Process\n included:")
+
+ggsave(filename = "Validity_E5.jpg",plot_validity, dpi = 300, width = 7, height = 6)
+knitr::include_graphics("Validity_E5.jpg")
 ```
