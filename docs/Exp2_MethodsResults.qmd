@@ -713,7 +713,7 @@ names(table_data)[which(names(table_data) == "FixDur_num")] <- "Fixation Dur."
 knitr::kable(table_data,digits = 2)
 ```
 
-The summary statistics for the proportion of correct responses in the five different blocks for all CTI durations are given in @tbl-descriptives. @fig-descriptive displays the average performance across the different conditions and includes performance of each subject in each of the conditions.
+The summary statistics for the proportion of correct responses in the five different blocks for all CTI durations are given in @tbl-descriptivesCTI and for all Fixation Durations in @tbl-descriptivesFixDur. @fig-descriptive displays the average performance across the different conditions and includes performance of each subject in each of the conditions.
 
 ```{r FigDesc, echo=FALSE}
 plot_data <- data %>%
@@ -926,6 +926,11 @@ pp_plot_theoretical <- ggplot(data = tidy_pred_theoretical,
   theme_bw() +
   theme(panel.grid.major.x = element_blank())
 ggsave(filename = "figures_E2/PostPredictives_theoretical_E2.jpg",pp_plot_theoretical, dpi = 300, width = 7, height = 6)
+
+bf_pars_th_full <- bayestestR::bayesfactor_parameters(fit_E2_th_full, prior = fit_E2_th_full_prior)
+bf_inhibreac <- bayes_factor(marginalLL[["noInhReSD"]], marginalLL[["reduced"]])
+
+min_bf_parameters <- min(c(exp(bf_pars_th_full$log_BF[which(bf_pars_th_full$Parameter != "b_InhibReac_Intercept")]), bf_inhibreac$bf_median_based))
 ```
 
 
@@ -936,7 +941,7 @@ ggsave(filename = "figures_E2/PostPredictives_theoretical_E2.jpg",pp_plot_theore
 
 @fig-predictive shows the posterior predictive estimates from the Bayesian GLM for the different experimental blocks and the changes in performance across the different CTI levels on the proportion correct scale. The theoretical model fits adequately to the observed data, as indicated by the black crosses in the plot overlaying closely with the posterior mean predicted in each condition.
 
-As in Experiment 1, we tested if there is evidence for the different theoretical assumed processes contributing to performance in the manual Anti-Saccade task. A summary of parameter estimates is displayed in @tbl-parameters. All parameters were credibly different from zero, $BF_{01} = `r exp(min(bf_pars_th_full$log_BF[bf_pars_th_full$log_BF > 0]))`$, which replicates the results from Experiment 1.
+As in Experiment 1, we tested if there is evidence for the different theoretical assumed processes contributing to performance in the manual Anti-Saccade task. A summary of parameter estimates is displayed in @tbl-parameters. All parameters were credibly different from zero, $BF_{10} > `r print_num(min_bf_parameters)`$, which replicates the results from Experiment 1.
 
 ```{r ParTable}
 #| label: tbl-parameters
@@ -1071,8 +1076,8 @@ plot_validity <- ggplot(data = df_cor,
   theme_bw() +
   theme(panel.grid.major.x = element_blank())
 
-ggsave(filename = "figures_E2/Validity_E9.jpg",plot_validity, dpi = 300, width = 7, height = 6)
-knitr::include_graphics("figures_E2/Validity_E9.jpg")
+ggsave(filename = "figures_E2/Validity_E2.jpg",plot_validity, dpi = 300, width = 7, height = 6)
+knitr::include_graphics("figures_E2/Validity_E2.jpg")
 ```
 
 
