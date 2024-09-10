@@ -168,7 +168,11 @@ plotDesc_WMC <- ggplot(aggData_WMC,
   stat_summary() +
   geom_jitter(alpha = 0.2) +
   labs(y = "Proportion Correct", x = "Task", color = "Task") +
-  theme(legend.position = "none")
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank(),
+        legend.position = "none")
+
+ggsave(filename = "figures_E2/E2_Descriptives_WMC.jpg",plotDesc_WMC, dpi = 300, width = 4, height = 4)
 
 aggData_WMC <- data_WMC %>% 
   filter(task != "CS processing", task != "CS") %>% 
@@ -309,7 +313,9 @@ plotDrift_PS <- ggplot(data = aggData_PS,
   stat_summary(position = position_dodge(plot_dodge)) +
   geom_jitter(alpha = 0.2, position = ggplot2::position_jitterdodge(jitter.width = jitter_width, dodge.width = plot_dodge)) +
   labs(y = "Drift Rate", x = "Task", color = "Task") +
-  theme(legend.position = "none")
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank(),
+        legend.position = "none")
 
 
 aggData_PS_acc <- data_PS_clean %>% 
@@ -325,7 +331,9 @@ plotACC_PS <- ggplot(data = aggData_PS_acc,
   geom_jitter(alpha = 0.2, position = ggplot2::position_jitterdodge(jitter.width = 0.25, dodge.width = plot_dodge)) +
   labs(y = "Proportion Correct", x = "Task Difficulty", color = "Task") +
   geom_hline(yintercept = 0.5, color = "red", linetype = "dashed") +
-  theme(legend.position = "none")
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank(),
+        legend.position = "none")
 
 aggData_PS_rt <- data_PS_clean %>% 
   filter(RTms > 50, RTms < 5000, !is.na(correct)) %>% 
@@ -340,7 +348,9 @@ plotRT_PS <- ggplot(data = aggData_PS_rt,
   stat_summary(position = position_dodge(plot_dodge)) +
   geom_jitter(alpha = 0.2, position = ggplot2::position_jitterdodge(jitter.width = 0.25, dodge.width = plot_dodge)) +
   labs(y = "Mean Reaction Time (in s)", x = "Task Difficulty", color = "Task") +
-  theme(legend.position = "none")
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank(),
+        legend.position = "none")
 
 ggsave(filename = "figures_E2/E2_Descriptives_PSdrift.jpg",plotDrift_PS, dpi = 300, width = 4, height = 4)
 ggsave(filename = "figures_E2/E2_Descriptives_PSrt.jpg",plotRT_PS, dpi = 300, width = 4, height = 4)
@@ -805,7 +815,7 @@ for(i in 1:length(all_model_formulas)) {
   model_formula = all_model_formulas[[i]]
   marginalLL[[i]] <- readRDS(paste("modelFits_E2/bridge_E2_", model_name, ".rds", sep = ""))
 }
-names(marginalLL) <- names(all_model_formulas)[1:8]
+names(marginalLL) <- names(all_model_formulas)
 
 noSD_models <- names(marginalLL)[grepl("SD",names(marginalLL))]
 bf_noSD <- data.frame(
@@ -828,7 +838,10 @@ for(i in 1:length(noSD_models)) {
 fit_E2_sat <- readRDS("modelFits_E2/fit_E2_saturated.rds")
 
 fit_E2_th_full <- readRDS("modelFits_E2/fit_E2_th_full.rds")
+fit_E2_th_full_prior <- readRDS("modelFits_E2/fit_E2_th_full_priors.rds")
+
 fit_E2_th_final <- readRDS("modelFits_E2/fit_E2_th_final.rds")
+fit_E2_th_final_priors <- readRDS("modelFits_E2/fit_E2_th_final_priors.rds")
 
 # extract fixed effect for theoretical model
 fixFX <- round(fixef(fit_E2_th_full),2)
@@ -883,7 +896,7 @@ newdata_theoretical <- expand.grid(
   left_join(Block2Conds) %>% 
   filter(!is.na(Block))
 
-tidy_pred_theoretical <- fit_E2_th_final %>% 
+tidy_pred_theoretical <- fit_E2_th_full %>% 
   tidybayes::epred_draws(newdata = newdata_theoretical, ndraws = 1000) %>% 
   group_by(ID, CTI_num, FixDur_num, binding, bindArb, inhibition, saccade, bottomup) %>% 
   summarise(predValue = mean(.epred), .groups = "drop") %>%
@@ -893,7 +906,7 @@ tidy_pred_theoretical <- fit_E2_th_final %>%
   filter(!is.na(Block))
 
 pp_plot_theoretical <- ggplot(data = tidy_pred_theoretical,
-                              aes(x = as.factor(CTI_num*100), y = predValue, color = as.factor(Block), fill = as.factor(Block), 
+                              aes(x = as.factor(CTI_num*1000), y = predValue, color = as.factor(Block), fill = as.factor(Block), 
                                   group = as.factor(Block), shape = as.factor(bottomup))) +
   facet_grid(inhibition ~ binding, labeller = label_both) +
   ggplot2::geom_jitter(position = ggplot2::position_jitterdodge(jitter.width = jitter_width, dodge.width = plot_dodge),
@@ -945,12 +958,14 @@ knitr::kable(allFX[,c(1,3:5,7:8)], digits = 2)
 #| label: tbl-bfSD
 #| tab-cap: "Bayes Factors in favor of individual differences in the processes seperated."
 # test if there is evidence for individual differences in the different processes
+bf_final <- bayes_factor(marginalLL[["th_final"]], marginalLL[["th_full"]])
+
 knitr::kable(bf_noSD, digits = 2)
 ```
 
-We again tested if there are credible individual differences in the processes dissociated in our theoretical model. For this, we selectively fixed the random effect of one of the processes to zero and tested if this model was favored over a model freely estimating the random effect. These analyses indicated that there was credible evidence for individual differences in all processes separated in the model (see @tbl-bfSD).
+We again tested if there are credible individual differences in the processes dissociated in our theoretical model. For this, we selectively fixed the random effect of one of the processes to zero and tested if this model was favored over a model freely estimating the random effect. These analyses indicated that there was credible evidence for individual differences in all but processes separated in the model (see @tbl-bfSD). Like in Experiment 1, there was evidence against individual differences in goal Maintenance. Also similar to experiment 1, the Bayes Factors for individual difference in proactive inhibition was quite variable, in this experiment this was also the case for individual differences in reactive inhibition. This is potentially due to the reduction of CTI conditions that render the estimation of intial activation eliciting reflexive saccades and its reduction over time more challenging. For consistency with experiment 1, we therefore fixed the random effect of goal maintenance and proactive inhibition to zero. This reduced model fitted better than a model including all random effects, $BF =$ `r printnum(bf_final$bf_median_based, format = "g")`.
 
-The standard deviations and correlations between the random effects are displayed in @tbl-correlations
+Liek for experiment 1, we estimated the correlations between the random effects that were retained in this final model. @tbl-correlations shows the estimated standard deviations of all random effects and the correlations among them. Generally, correlations between random effects were small, most $|r_s| < .30$, except for correlations between random effects for binding ability and costs of arbitrary bindings with each other, $r = .66$, and with reactive inhibition, $r_s = .44 - .47$, as well as individual differences in the automatic capture of attention by the cue, $r = .49$. Given the differences between experiment 1 and 2 with respect to overall proportion correct, these correlations should be interpreted with caution and need replication in a larger sample to obtain stable estimates for the relationship between the theoretically dissociated processes.
 
 ```{r CorrTable}
 #| label: tbl-correlations
@@ -973,7 +988,7 @@ knitr::kable(cormat, digits = 2)
 
 ### Validity of the Anti-Saccade Task
 
-@fig-validity shows correlations between the random effects of processes separated in the GLM with the observed performance in the different experimental blocks. These correlations capture to what extend performance in one of the experimental blocks is a valid indicator for the processes. A process pure indicator would only correlate with one of the process measures. As is evident from the table, none of the experimental blocks is a truly process pure indicator for a single process. With respect to the typical use of the anti-saccade task (using a CTI of 50ms), it is measuring at least three processes: sensory discrimination, the speed of filtering automatic activation, and binding ability. Any correlation with external covariates can thus stem from a correlation with any of these processes. This renders the interpretation of the predictive power of performance in the anti-saccade task complex to interpret with respect to the processes that is responsible for it.
+@fig-validity shows correlations between the random effects of processes separated in the GLM with the observed performance in the different experimental blocks. These correlations capture to what extend performance in one of the experimental blocks is a valid indicator for the processes. A process pure indicator would only correlate with one of the process measures. As is evident from the figure and replicating the results from experiment 1, none of the experimental blocks is a truly process pure indicator for a single process. With respect to the typical use of the anti-saccade task (using a CTI of 50ms), experiment 2 indicated that it is measuring at least three processes as we found in experiment 1: sensory discrimination, the speed of filtering automatic activation, and binding ability. The contribution of binding ability in this experiment was actually even a little stronger than that of perceptual speed. This is potentially due to the adaptation of the font size that reduced the transient onset signal of the target letter and required that participants performed controlled saccades to actually be able to detect which target letter was shown.
 
 ```{r}
 #| label: fig-validity
@@ -1040,6 +1055,9 @@ df_cor[which(df_cor$name == "Capture"),]$process <- ifelse(
 df_cor[which(df_cor$name == "Saccade"),]$process <- ifelse(
   df_cor[which(df_cor$name == "Saccade"),]$Block %in% saccade_blocks, "yes", "no")
 
+df_cor$name <- factor(df_cor$name)
+levels(df_cor$name) <- c("Binding: Arbitrary", "Binding", "Bottom-Up Capture", "Inhibition: Reactive", "Perc. Speed", "Saccade")
+
 plot_validity <- ggplot(data = df_cor,
                         aes(x = as.factor(CTI_num*1000), y = mean, ymin = CIlow, ymax = CIhigh, color = Block, shape = process, alpha = process)) +
   geom_point(position = position_dodge(0.5), size =2) +
@@ -1048,7 +1066,10 @@ plot_validity <- ggplot(data = df_cor,
   geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
   scale_alpha_discrete(range = c(1/3,1)) +
   labs(x = "Cue-Target Interval (ms)", y = "Validity (Correlation: Process with Prop. Corr)",
-       shape = "Process\n included:", alpha = "Process\n included:")
+       shape = "Process\n included:", alpha = "Process\n included:") +
+  coord_cartesian(ylim = c(-0.5,1)) +
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank())
 
 ggsave(filename = "figures_E2/Validity_E9.jpg",plot_validity, dpi = 300, width = 7, height = 6)
 knitr::include_graphics("figures_E2/Validity_E9.jpg")
@@ -1101,7 +1122,7 @@ ggsave(filename = "figures_E2/DescCorrelation_E1.jpg",plot_cor_descriptive, dpi 
 knitr::include_graphics("figures_E2/DescCorrelation_E1.jpg")
 ```
 
-In @fig-covcorr the correlations of the average performance in the different experimental blocks of the manual anti-saccade task with the two covariates, working memory capacity (WMC) and processing speed (PS) are shown. As indicated by the 95% confidence intervals, the correlations with both covariates are all significantly different from zero for all experimental. Although this replicates previous studies that found correlations between performance in the manual anti-saccade task, these results indicate that processes shared between all tasks are likely underlying the relationship between performance in the anti-saccade task with the covariates. Otherwise, only performance in the anti-saccade block should correlate with the covariate.
+In @fig-covcorr the correlations of the average performance in the different experimental blocks of the manual anti-saccade task with the two covariates, working memory capacity (WMC) and processing speed (PS) are shown. As indicated by the 95% confidence intervals, the correlations with both covariates are all significantly different from zero for all experimental. Although this replicates previous studies that found correlations between performance in the manual anti-saccade task, the results also indicate that most likely processes shared between all tasks are underlying the relationship between performance in the anti-saccade task with the covariates. Otherwise, only performance in the anti-saccade block should correlate with the covariate.
 
 ### Relationship of the theoretically assumed processes with WMC & PS
 
@@ -1336,7 +1357,7 @@ To evaluate which of these relationships differs credibly from zero, we entered 
 
 ```{r}
 #| label: tbl-relationshipWMC
-#| tab-cap: "Parameters estimates for the relationship of WMC and processes in the manual anti-saccade task"
+#| tab-cap: "Unstandardized parameters estimates for the relationship for the relationship of WMC and and the dissociated processes in the manual anti-saccade task"
 fixFX_WMC <- fixef(fit_E2_WMC_all)
 WMC_cols <- grepl("_WMC",rownames(fixFX_WMC))
 fixFX_WMC <- as.data.frame(fixFX_WMC[WMC_cols,c("Estimate","Q2.5","Q97.5")])

@@ -502,7 +502,7 @@ desc_plot <- ggplot(data = plot_data,
 ggsave(filename = "figures_E1/E1_Descriptives.jpg",desc_plot, dpi = 300, width = 7, height = 6)
 ```
 
-![Average performance (circles and triangles) in the five experimental conditions for each level of CTI duration in Experiment 1. Conditions are grouped into panels by whether they require inhibition of a saccade (rows) and whether they afford using stimulus-response bindings between cue and target location to anticipate the target location (columns). The point clouds around each mean represent the subject estimates, and the dashed red line represents chance performance.  ](figures_E1/E1_Descriptives.jpg){#fig-descriptive}
+![Average performance (circles and triangles) in the five experimental conditions for each level of CTI duration in Experiment 1. Conditions are grouped into panels by whether they require inhibition of a saccade (rows) and whether they afford using stimulus-response bindings between cue and target location to anticipate the target location (columns). The point clouds around each mean represent the subject estimates, and the dashed red line represents chance performance.](figures_E1/E1_Descriptives.jpg){#fig-descriptive}
 
 ## GLM: Accuracy
 
@@ -578,7 +578,6 @@ for(i in 1:length(noSD_models)) {
   bf_noSD$max_bf[i] <- max(bf$bf)
 }
 ```
-
 
 ```{r ModelComparison}
 bf_final <- bayes_factor(marginalLL$th_full, marginalLL$th_final)
