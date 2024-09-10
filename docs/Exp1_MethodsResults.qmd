@@ -204,15 +204,15 @@ BasePerformance <- function(x, Baseline, scale = "prob") {
 
 
 ggplot() +
-  xlim(0,1) +
+  xlim(0,0.5) +
   geom_function(fun = expDecay,
-                args = list(Baseline = 1.43, ActCue = 0.5, filterSpeed = 2.5, scale = "logit"),
+                args = list(Baseline = 0.59, ActCue = 0.35, filterSpeed = 5, scale = "logit"),
                 color = "darkred")  +
   geom_function(fun = linBinding,
-                args = list(Baseline = 1.43, bindingAct = 0.5, scale = "logit"),
+                args = list(Baseline = 0.59, bindingAct = 2.76, scale = "logit"),
                 color = "darkgreen") +
   geom_function(fun = BasePerformance,
-                args = list(Baseline = 1.43, scale = "logit"),
+                args = list(Baseline = 0.59, scale = "logit"),
                 linetype = "dashed") +
   labs(y = "logit(p)",
        x = "CTI duration (s)",
@@ -222,15 +222,15 @@ ggplot() +
         panel.grid.minor.x = element_blank())
 
 ggplot() +
-  xlim(0,1) +
+  xlim(0,0.5) +
   geom_function(fun = expDecay,
-                args = list(Baseline = 1.43, ActCue = 0.5, filterSpeed = 2.5),
+                args = list(Baseline = 0.59, ActCue = 0.35, filterSpeed =  5),
                 color = "darkred")  +
   geom_function(fun = linBinding,
-                args = list(Baseline = 1.43, bindingAct = 0.5),
+                args = list(Baseline = 0.59, bindingAct = 2.76),
                 color = "darkgreen") +
   geom_function(fun = BasePerformance,
-                args = list(Baseline = 1.43),
+                args = list(Baseline = 0.59),
                 linetype = "dashed") +
   labs(y = "Proportion Correct",
        x = "CTI duration (s)",
