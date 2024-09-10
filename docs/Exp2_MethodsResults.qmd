@@ -35,7 +35,7 @@ In this study, we again isolated different processes contributing to performance
 ```{r load_data, include=FALSE}
 data <- RawData_Exp9  %>% filter(CTI != 200)
 nSub_total <- length(unique(data$ID))
-data$CTI_num <- (data$CTI)/100
+data$CTI_num <- (data$CTI)/1000
 data$CTI <- as.factor(data$CTI)
 data$FixDur_num <- (data$FixDur - mean(unique(data$FixDur)))/1000
 
@@ -55,17 +55,16 @@ data$inhibition <- ifelse(data$Block %in% inhib_blocks, 1, 0)
 data$binding <- ifelse(data$Block %in% bind_blocks, 1, 0)
 data$bottomup <- ifelse(data$Block %in% bottomup_blocks, 1, 0)
 data$saccade <- ifelse(data$Block %in% saccade_blocks, 1, 0)
-data$bindArb <- factor(ifelse(data$binding == 0, "no",
-                              ifelse(data$Block %in% bind_arbitraty, "yes","no")),
-                       levels = c("yes","no"))
+data$bindArb <- ifelse(data$binding == 0, 0,
+                       ifelse(data$Block %in% bind_arbitraty, -1,1))
 
 Block2Conds$inhibition <- ifelse(Block2Conds$Block %in% inhib_blocks,1, 0)
 Block2Conds$binding <- ifelse(Block2Conds$Block %in% bind_blocks, 1, 0)
 Block2Conds$bottomup <- ifelse(Block2Conds$Block %in% bottomup_blocks, 1, 0)
 Block2Conds$saccade <- ifelse(Block2Conds$Block %in% saccade_blocks, 1, 0)
-Block2Conds$bindArb <- factor(ifelse(Block2Conds$binding == 0, "no",
-                                     ifelse(Block2Conds$Block %in% bind_arbitraty, "yes","no")),
-                              levels = c("yes","no"))
+Block2Conds$bindArb <- ifelse(Block2Conds$binding == 0, 0,
+                              ifelse(Block2Conds$Block %in% bind_arbitraty, -1,1))
+
 outlier_data <- data %>% 
   group_by(ID, Block, CTI) %>% 
   summarise(meanPC = mean(correct),
@@ -89,8 +88,6 @@ agg_data <- data %>%
     nTrials = dplyr::n(),
     .groups = "drop"
   )
-
-contrasts(agg_data$bindArb) <- bayestestR::contr.equalprior
 ```
 
 ## Participants
@@ -163,14 +160,25 @@ aggData_WMC <- data_WMC %>%
             setsize = mean(setsize)) %>% 
   summarise(meanPC = mean(meanPC),
             nRet = n())
+aggData_WMC$task <- as.factor(aggData_WMC$task)
+levels(aggData_WMC$task) <- c("Col. Bind.", "Num. Upd.")
 
 plotDesc_WMC <- ggplot(aggData_WMC,
                        aes(y = meanPC, x = task, color = task)) +
   stat_summary() +
   geom_jitter(alpha = 0.2) +
-  labs(y = "Proportion Correct", x = "Task")
+  labs(y = "Proportion Correct", x = "Task", color = "Task") +
+  theme(legend.position = "none")
 
-aggData_WMC <- aggData_WMC %>% 
+aggData_WMC <- data_WMC %>% 
+  filter(task != "CS processing", task != "CS") %>% 
+  group_by(ID,task,trialNum) %>% 
+  summarise(meanPC = mean(correct),
+            nCor = sum(correct),
+            nRet = n(),
+            setsize = mean(setsize)) %>% 
+  summarise(meanPC = mean(meanPC),
+            nRet = n()) %>% 
   select(-nRet) %>% 
   tidyr::pivot_wider(names_from = c(task),
                      values_from = meanPC)
@@ -293,12 +301,16 @@ aggData_PS <- data_PS_clean %>%
   summarise(v = ez.dm(RT = RT, ACC = accuracy, robust = TRUE)[1],
             a = ez.dm(RT = RT, ACC = accuracy, robust = TRUE)[2],
             t0 = ez.dm(RT = RT, ACC = accuracy, robust = TRUE)[3]) 
+aggData_PS$task <- as.factor(aggData_PS$task)
+levels(aggData_PS$task) <- c("Col. Judg.", "Choice RT", "Num. Judg.")
 
 plotDrift_PS <- ggplot(data = aggData_PS,
                        aes(x = task, y = v, color = task)) +
   stat_summary(position = position_dodge(plot_dodge)) +
-  geom_jitter(alpha = 0.2, position = ggplot2::position_jitterdodge(jitter.width = 0.25, dodge.width = plot_dodge)) +
-  labs(y = "Drift Rate", x = "Task", color = "Task")
+  geom_jitter(alpha = 0.2, position = ggplot2::position_jitterdodge(jitter.width = jitter_width, dodge.width = plot_dodge)) +
+  labs(y = "Drift Rate", x = "Task", color = "Task") +
+  theme(legend.position = "none")
+
 
 aggData_PS_acc <- data_PS_clean %>% 
   filter(RTms > 50, RTms < 5000, !is.na(correct)) %>% 
@@ -312,7 +324,8 @@ plotACC_PS <- ggplot(data = aggData_PS_acc,
   stat_summary(position = position_dodge(plot_dodge)) +
   geom_jitter(alpha = 0.2, position = ggplot2::position_jitterdodge(jitter.width = 0.25, dodge.width = plot_dodge)) +
   labs(y = "Proportion Correct", x = "Task Difficulty", color = "Task") +
-  geom_hline(yintercept = 0.5, color = "red", linetype = "dashed")
+  geom_hline(yintercept = 0.5, color = "red", linetype = "dashed") +
+  theme(legend.position = "none")
 
 aggData_PS_rt <- data_PS_clean %>% 
   filter(RTms > 50, RTms < 5000, !is.na(correct)) %>% 
@@ -320,19 +333,27 @@ aggData_PS_rt <- data_PS_clean %>%
          accuracy = ifelse(correct, 1, 0)) %>%
   filter(accuracy == 1) %>% 
   group_by(ID, task) %>% 
-  summarise(meanRT = mean(RT))
+  summarise(meanRT = mean(RT)) 
 
 plotRT_PS <- ggplot(data = aggData_PS_rt,
                     aes(x = task, y = meanRT, color = task)) +
   stat_summary(position = position_dodge(plot_dodge)) +
   geom_jitter(alpha = 0.2, position = ggplot2::position_jitterdodge(jitter.width = 0.25, dodge.width = plot_dodge)) +
-  labs(y = "Mean Reaction Time (in s)", x = "Task Difficulty", color = "Task")
+  labs(y = "Mean Reaction Time (in s)", x = "Task Difficulty", color = "Task") +
+  theme(legend.position = "none")
 
-ggsave(filename = "figures_E2/E2_Descriptives_PSdrift.jpg",plotRT_PS, dpi = 300, width = 4, height = 4)
+ggsave(filename = "figures_E2/E2_Descriptives_PSdrift.jpg",plotDrift_PS, dpi = 300, width = 4, height = 4)
 ggsave(filename = "figures_E2/E2_Descriptives_PSrt.jpg",plotRT_PS, dpi = 300, width = 4, height = 4)
 ggsave(filename = "figures_E2/E2_Descriptives_PSacc.jpg",plotACC_PS, dpi = 300, width = 4, height = 4)
 
-aggData_PS <- aggData_PS %>% 
+aggData_PS <- data_PS_clean %>% 
+  filter(RTms > 50, RTms < 5000, !is.na(correct)) %>% 
+  mutate(RT = RTms/1000,
+         accuracy = ifelse(correct, 1, 0)) %>%  
+  group_by(ID, task) %>% 
+  summarise(v = ez.dm(RT = RT, ACC = accuracy, robust = TRUE)[1],
+            a = ez.dm(RT = RT, ACC = accuracy, robust = TRUE)[2],
+            t0 = ez.dm(RT = RT, ACC = accuracy, robust = TRUE)[3])  %>% 
   tidyr::pivot_wider(names_from = c(task),
                      values_from = c(v,a,t0))
 
@@ -551,6 +572,22 @@ model_th_reduced <- bf(correct | trials(nTrials) ~ PercSpeed -
                        arbBind    ~ 1 + (1 | r | ID),
                        nl = TRUE)
 
+model_th_final <- bf(correct | trials(nTrials) ~ PercSpeed - 
+                       inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                       binding * ((bindingAct + bindArb * arbBind) * CTI_num) +
+                       bottomup * capture +
+                       saccade * saccReq +
+                       goalMain * FixDur_num,
+                     PercSpeed  ~ 1 + (1 | r | ID),
+                     goalMain   ~ 1,
+                     capture    ~ 1 + (1 | r | ID),
+                     saccReq    ~ 1 + (1 | r | ID),
+                     InhibPro   ~ 1,
+                     InhibReac  ~ 1 + (1 | r | ID),
+                     bindingAct ~ 1 + (1 | r | ID),
+                     arbBind    ~ 1 + (1 | r | ID),
+                     nl = TRUE)
+
 all_model_formulas <- list(saturated = model_sat, 
                            th_full = model_th_full, 
                            noPercSD = model_th_noPercSD, 
@@ -561,7 +598,8 @@ all_model_formulas <- list(saturated = model_sat,
                            noInhReSD = model_th_noInhReSD, 
                            noBindSD = model_th_noBindSD,
                            noArbBindSD = model_th_noArbBindSD,
-                           reduced = model_th_reduced)
+                           reduced = model_th_reduced,
+                           th_final = model_th_final)
 
 ```
 
@@ -677,7 +715,7 @@ plot_data <- data %>%
   )
 
 desc_plot <- ggplot(data = plot_data,
-                    aes(x = as.factor(CTI_num*100), y = correct/nTrials, color = as.factor(Block), fill = as.factor(Block), 
+                    aes(x = as.factor(CTI_num*1000), y = correct/nTrials, color = as.factor(Block), fill = as.factor(Block), 
                         group = as.factor(Block), shape = as.factor(bottomup))) +
   facet_grid(inhibition ~ binding, labeller = label_both) +
   ggplot2::geom_jitter(position = ggplot2::position_jitterdodge(jitter.width = jitter_width, dodge.width = plot_dodge),
@@ -685,7 +723,7 @@ desc_plot <- ggplot(data = plot_data,
   stat_summary(position = position_dodge(plot_dodge), fun.data = mean_se) +
   ggplot2::stat_summary(geom = "line", fun = "mean", position = ggplot2::position_dodge(plot_dodge)) +
   geom_hline(yintercept = 0.33, color = "red", linetype = "dashed") +
-  labs(x = "Cue-Target Interval",
+  labs(x = "Cue-Target Interval (ms)",
        y = "Proportion Correct",
        color = "Block", fill = "Block",
        shape = "Pos Cue = Target",
@@ -693,10 +731,10 @@ desc_plot <- ggplot(data = plot_data,
   coord_cartesian(ylim = c(0,1)) +
   theme_bw() +
   theme(panel.grid.major.x = element_blank())
-ggsave(filename = "figures_E2/E9_Descriptives.jpg",desc_plot, dpi = 300, width = 7, height = 6)
+ggsave(filename = "figures_E2/E2_Descriptives.jpg",desc_plot, dpi = 300, width = 7, height = 6)
 ```
 
-![Average performance in the different experimental blocks for different CTI durations.](figures_E2/E9_Descriptives.jpg){#fig-descriptive}
+![Average performance in the different experimental blocks for different CTI durations.](figures_E2/E2_Descriptives.jpg){#fig-descriptive}
 
 @fig-descriptivesCov shows the performance in the working memory capacity and processing speed tasks.
 
@@ -714,111 +752,103 @@ plotDrift_PS
 ## GLM: Accuracy
 
 ```{r FitModel, include=FALSE}
-fitted_models <- list()
+for(i in 1:length(all_model_formulas)) {
+  model_name <- names(all_model_formulas)[i]
+  model_formula = all_model_formulas[[i]]
+  
+  if (model_name == "saturated") {
+    priors <- sat_priors
+  } else if(model_name == "reduced") {
+    priors <- theoretical_priors_reduced
+  } else {
+    priors <- theoretical_priors
+  }
+  
+  fitted_model <- brms::brm(model_formula,
+                            data = agg_data,
+                            family = model_family,
+                            backend = "cmdstanr",
+                            chains = nChains,
+                            iter = warmup_samples + postwarmup_samples, 
+                            warmup = warmup_samples,
+                            prior = priors,
+                            save_pars = save_pars(all = T),
+                            file = paste0("modelFits_E2/fit_E2_", model_name),
+                            file_refit = "on_change")
+  
+  prior_model <- brms::brm(model_formula,
+                           data = agg_data,
+                           family = model_family,
+                           backend = "cmdstanr",
+                           chains = nChains,
+                           iter = warmup_samples + postwarmup_samples, 
+                           warmup = warmup_samples,
+                           prior = priors,
+                           sample_prior = "only",
+                           save_pars = save_pars(all = T),
+                           file = paste0("modelFits_E2/fit_E2_", model_name,"_priors"),
+                           file_refit = "on_change")
+  
+  if (!file.exists(paste("modelFits_E2/bridge_E2_", model_name, ".rds", sep = ""))) {
+    bridge <- bridge_sampler(fitted_model, cores = 4, repetitions = 10)
+    saveRDS(bridge, paste("modelFits_E2/bridge_E2_", model_name, ".rds", sep = ""))
+  }
+}
+
+rm(fitted_model, prior_model, bridge)
+```
+
+```{r BayesFactors_SD}
 marginalLL <- list()
 for(i in 1:length(all_model_formulas)) {
   model_name <- names(all_model_formulas)[i]
   model_formula = all_model_formulas[[i]]
-  
-  if (model_name == "saturated") {
-    priors <- sat_priors
-  } else if(model_name == "reduced") {
-    priors <- theoretical_priors_reduced
-  } else {
-    priors <- theoretical_priors
-  }
-  
-  fitted_models[[i]] <- brms::brm(model_formula,
-                                  data = agg_data,
-                                  family = model_family,
-                                  backend = "cmdstanr",
-                                  chains = nChains,
-                                  iter = warmup_samples + postwarmup_samples, 
-                                  warmup = warmup_samples,
-                                  prior = priors,
-                                  save_pars = save_pars(all = T),
-                                  file = paste0("modelFits_E2/fit_E2_", model_name),
-                                  file_refit = "on_change")
-  
-  if (!file.exists(paste("modelFits_E2/bridge_E2_", model_name, ".rds", sep = ""))) {
-    bridge <- bridge_sampler(fitted_models[[i]], cores = 4, repetitions = 10)
-    saveRDS(bridge, paste("modelFits_E2/bridge_E2_", model_name, ".rds", sep = ""))
-  } else {
-    bridge <- readRDS(paste("modelFits_E2/bridge_E2_", model_name, ".rds", sep = ""))
-  }
-  
-  marginalLL[[i]] <- bridge
+  marginalLL[[i]] <- readRDS(paste("modelFits_E2/bridge_E2_", model_name, ".rds", sep = ""))
 }
+names(marginalLL) <- names(all_model_formulas)[1:8]
 
-prior_models <- list()
-for(i in 1:length(all_model_formulas)) {
-  model_name <- names(all_model_formulas)[i]
-  model_formula = all_model_formulas[[i]]
-  
-  if (model_name == "saturated") {
-    priors <- sat_priors
-  } else if(model_name == "reduced") {
-    priors <- theoretical_priors_reduced
-  } else {
-    priors <- theoretical_priors
-  }
-  
-  prior_models[[i]] <- brms::brm(model_formula,
-                                 data = agg_data,
-                                 family = model_family,
-                                 backend = "cmdstanr",
-                                 chains = nChains,
-                                 iter = warmup_samples + postwarmup_samples, 
-                                 warmup = warmup_samples,
-                                 prior = priors,
-                                 sample_prior = "only",
-                                 save_pars = save_pars(all = T),
-                                 file = paste0("modelFits_E2/fit_E2_", model_name,"_priors"),
-                                 file_refit = "on_change")
-}
-
-
-bf_pars_th_full <- bayestestR::bayesfactor_parameters(fit_E9_th_full,
-                                                      prior = fit_E9_th_full_prior)
-
-bf_pars_th_PS <- bayestestR::bayesfactor_parameters(fit_E9_th_PS,
-                                                    prior = fit_E9_th_PS_prior)
-
-bf_pars_th_WMC <- bayestestR::bayesfactor_parameters(fit_E9_th_WMC,
-                                                     prior = fit_E9_th_WMC_prior)
-
-# extract fixed effect for theoretical model
-fixFX <- round(fixef(fit_E9_th_full),2)
-
-newdata <- expand.grid(
-  ID = unique(agg_data$ID),
-  nTrials = 1,
-  CTI_num = c(0.5,4.0),
-  Block = unique(agg_data$Block)
+noSD_models <- names(marginalLL)[grepl("SD",names(marginalLL))]
+bf_noSD <- data.frame(
+  sd = noSD_models,
+  median_bf = NaN,
+  min_bf = NaN,
+  max_bf = NaN
 )
 
-newdata2 <- expand.grid(
+for(i in 1:length(noSD_models)) {
+  bf <- bayes_factor(marginalLL[["th_full"]], marginalLL[[noSD_models[i]]])
+  
+  bf_noSD$median_bf[i] <- bf$bf_median_based
+  bf_noSD$min_bf[i] <- min(bf$bf)
+  bf_noSD$max_bf[i] <- max(bf$bf)
+}
+```
+
+```{r LoadModel, include=FALSE}
+fit_E2_sat <- readRDS("modelFits_E2/fit_E2_saturated.rds")
+
+fit_E2_th_full <- readRDS("modelFits_E2/fit_E2_th_full.rds")
+fit_E2_th_final <- readRDS("modelFits_E2/fit_E2_th_final.rds")
+
+# extract fixed effect for theoretical model
+fixFX <- round(fixef(fit_E2_th_full),2)
+
+newdata_saturated <- expand.grid(
   ID = unique(agg_data$ID),
   nTrials = 1,
   CTI_num = unique(agg_data$CTI_num),
-  binding = unique(agg_data$binding),
-  inhibition = unique(agg_data$inhibition),
-  SaccadeFromCue = unique(agg_data$SaccadeFromCue),
-  SaccadeFromFixation = unique(agg_data$SaccadeFromFixation),
-  bindArb = unique(agg_data$bindArb)
-) %>% 
-  left_join(Block2Conds) %>% 
-  filter(!is.na(Block))
+  Block = unique(agg_data$Block)
+)
 
-tidy_pred_saturated <- fit_E9_sat %>% 
-  tidybayes::epred_draws(newdata = newdata, ndraws = 1000) %>% 
+tidy_pred_saturated <- fit_E2_sat %>% 
+  tidybayes::epred_draws(newdata = newdata_saturated, ndraws = 1000) %>% 
   group_by(ID, CTI_num, Block) %>% 
   summarise(predValue = mean(.epred)) %>% 
   left_join(Block2Conds) 
 
 pp_plot_saturated <- ggplot(data = tidy_pred_saturated,
-                            aes(x = as.factor(CTI_num), y = predValue, color = as.factor(Block), fill = as.factor(Block), 
-                                group = as.factor(Block), shape = as.factor(SaccadeFromCue))) +
+                            aes(x = as.factor(CTI_num*1000), y = predValue, color = as.factor(Block), fill = as.factor(Block), 
+                                group = as.factor(Block), shape = as.factor(bottomup))) +
   facet_grid(inhibition ~ binding, labeller = label_both) +
   facet_grid(inhibition ~ binding, labeller = label_both) +
   ggplot2::geom_jitter(position = ggplot2::position_jitterdodge(jitter.width = jitter_width, dodge.width = plot_dodge),
@@ -827,26 +857,44 @@ pp_plot_saturated <- ggplot(data = tidy_pred_saturated,
   ggplot2::stat_summary(geom = "line", fun = "mean", position = ggplot2::position_dodge(plot_dodge)) +
   stat_summary(geom = "point", fun = mean, position = position_dodge(plot_dodge),
                data = agg_data, color = "black", shape = "cross",
-               aes(x = as.factor(CTI_num), y = correct/nTrials)) +
+               aes(x = as.factor(CTI_num*1000), y = correct/nTrials)) +
   geom_hline(yintercept = 0.33, color = "red", linetype = "dashed") +
-  labs(x = "Cue-Target Interval",
+  labs(x = "Cue-Target Interval (ms)",
        y = "Proportion Correct",
        color = "Block", fill = "Block",
        shape = "Pos Cue = Target",
        title = "Posterior Predictives (Saturated)") +
-  coord_cartesian(ylim = c(0,1))
+  coord_cartesian(ylim = c(0,1)) +
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank())
 ggsave(filename = "figures_E2/PostPredictives_Saturated_E2.jpg",pp_plot_saturated, dpi = 300, width = 7, height = 6)
 
-tidy_pred_theoretical <- fit_E9_th_full %>% 
-  tidybayes::epred_draws(newdata = newdata2, ndraws = 1000) %>% 
-  group_by(ID, CTI_num, binding, bindArb, inhibition, SaccadeFromCue, SaccadeFromFixation) %>% 
-  summarise(predValue = mean(.epred)) %>% 
+newdata_theoretical <- expand.grid(
+  ID = unique(fit_E2_th_final$data$ID),
+  nTrials = 1,
+  CTI_num = unique(fit_E2_th_final$data$CTI_num),
+  FixDur_num = unique(fit_E2_th_final$data$FixDur_num),
+  binding = unique(fit_E2_th_final$data$binding),
+  inhibition = unique(fit_E2_th_final$data$inhibition),
+  saccade = unique(fit_E2_th_final$data$saccade),
+  bottomup = unique(fit_E2_th_final$data$bottomup),
+  bindArb = unique(fit_E2_th_final$data$bindArb)
+) %>% 
+  left_join(Block2Conds) %>% 
+  filter(!is.na(Block))
+
+tidy_pred_theoretical <- fit_E2_th_final %>% 
+  tidybayes::epred_draws(newdata = newdata_theoretical, ndraws = 1000) %>% 
+  group_by(ID, CTI_num, FixDur_num, binding, bindArb, inhibition, saccade, bottomup) %>% 
+  summarise(predValue = mean(.epred), .groups = "drop") %>%
+  group_by(ID, CTI_num, binding, bindArb, inhibition, saccade, bottomup) %>% 
+  summarise(predValue = mean(predValue), .groups = "drop") %>%  
   left_join(Block2Conds) %>% 
   filter(!is.na(Block))
 
 pp_plot_theoretical <- ggplot(data = tidy_pred_theoretical,
-                              aes(x = as.factor(CTI_num), y = predValue, color = as.factor(Block), fill = as.factor(Block), 
-                                  group = as.factor(Block), shape = as.factor(SaccadeFromCue))) +
+                              aes(x = as.factor(CTI_num*100), y = predValue, color = as.factor(Block), fill = as.factor(Block), 
+                                  group = as.factor(Block), shape = as.factor(bottomup))) +
   facet_grid(inhibition ~ binding, labeller = label_both) +
   ggplot2::geom_jitter(position = ggplot2::position_jitterdodge(jitter.width = jitter_width, dodge.width = plot_dodge),
                        alpha = point_alpha) +
@@ -854,20 +902,24 @@ pp_plot_theoretical <- ggplot(data = tidy_pred_theoretical,
   stat_summary(position = position_dodge(plot_dodge), fun.data = mean_se) +
   stat_summary(geom = "point", fun = mean, position = position_dodge(plot_dodge),
                data = agg_data, color = "black", shape = "cross",
-               aes(x = as.factor(CTI_num), y = correct/nTrials)) +
+               aes(x = as.factor(CTI_num*1000), y = correct/nTrials)) +
   geom_hline(yintercept = 0.33, color = "red", linetype = "dashed") +
   labs(x = "Cue-Target Interval (in 1/100 ms)",
        y = "Proportion Correct",
        color = "Block", fill = "Block",
        shape = "Pos Cue = Target",
        title = "Posterior Predictives (Theoretical)") +
-  coord_cartesian(ylim = c(0,1))
+  coord_cartesian(ylim = c(0,1))+
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank())
 ggsave(filename = "figures_E2/PostPredictives_theoretical_E2.jpg",pp_plot_theoretical, dpi = 300, width = 7, height = 6)
 ```
 
+
+
 ### Experimental Effects
 
-![](PostPredictives_theoretical_E9.jpg){#fig-predictive}
+![](figures_E2/PostPredictives_theoretical_E2.jpg){#fig-predictive}
 
 @fig-predictive shows the posterior predictive estimates from the Bayesian GLM for the different experimental blocks and the changes in performance across the different CTI levels on the proportion correct scale. The theoretical model fits adequately to the observed data, as indicated by the black crosses in the plot overlaying closely with the posterior mean predicted in each condition.
 
@@ -876,10 +928,15 @@ As in Experiment 1, we tested if there is evidence for the different theoretical
 ```{r ParTable}
 #| label: tbl-parameters
 #| tab-cap: "Overview of parameter estimates"
-fixFX <- fixef(fit_E9_th_full)
 rownames(fixFX) <- stringr::str_remove(rownames(fixFX), "_Intercept")
-fixFX["filterSpeed",]<- exp(fixFX["filterSpeed",])
-knitr::kable(fixFX[,c("Estimate","Q2.5","Q97.5")], digits = 2)
+fixFX["InhibReac",]<- exp(fixFX["InhibReac",])
+
+corr_est <- VarCorr(fit_E2_th_full)$ID
+sdFX <- round(corr_est$sd,2)
+row.names(sdFX) <- stringr::str_remove(row.names(sdFX),"_Intercept")
+
+allFX <- cbind(fixFX, sdFX)
+knitr::kable(allFX[,c(1,3:5,7:8)], digits = 2)
 ```
 
 ### Individual differences
@@ -888,24 +945,7 @@ knitr::kable(fixFX[,c("Estimate","Q2.5","Q97.5")], digits = 2)
 #| label: tbl-bfSD
 #| tab-cap: "Bayes Factors in favor of individual differences in the processes seperated."
 # test if there is evidence for individual differences in the different processes
-bf_noBaseSD <- bayes_factor(marginalLL$full, marginalLL$noBaseSD)
-bf_noSfFSD <- bayes_factor(marginalLL$full, marginalLL$noSfFSD)
-bf_noSfCSD <- bayes_factor(marginalLL$full, marginalLL$noSfCSD)
-bf_noAcSD <- bayes_factor(marginalLL$full, marginalLL$noAcSD)
-bf_noFSD <- bayes_factor(marginalLL$full, marginalLL$noFSD)
-bf_noBindSD <- bayes_factor(marginalLL$full, marginalLL$noBindSD)
-bf_noBindArbSD <- bayes_factor(marginalLL$full, marginalLL$noBindArbSd)
-
-df_bf_SD <- data.frame(
-  process = c("Baseline","Saccade from Fixation", "Saccade From Cue", "Act: Cue", "Filtering", "Binding"),
-  median_bf = c(bf_noBaseSD$bf_median_based, bf_noSfFSD$bf_median_based, bf_noSfCSD$bf_median_based, bf_noAcSD$bf_median_based,
-                bf_noFSD$bf_median_based, bf_noBindSD$bf_median_based),
-  min_bf = c(min(bf_noBaseSD$bf), min(bf_noSfFSD$bf), min(bf_noSfCSD$bf), min(bf_noAcSD$bf),
-             min(bf_noFSD$bf), min(bf_noBindSD$bf)),
-  max_bf = c(max(bf_noBaseSD$bf), max(bf_noSfFSD$bf), max(bf_noSfCSD$bf), max(bf_noAcSD$bf),
-             max(bf_noFSD$bf), max(bf_noBindSD$bf))
-)
-knitr::kable(df_bf_SD, digits = 2)
+knitr::kable(bf_noSD, digits = 2)
 ```
 
 We again tested if there are credible individual differences in the processes dissociated in our theoretical model. For this, we selectively fixed the random effect of one of the processes to zero and tested if this model was favored over a model freely estimating the random effect. These analyses indicated that there was credible evidence for individual differences in all processes separated in the model (see @tbl-bfSD).
@@ -915,9 +955,9 @@ The standard deviations and correlations between the random effects are displaye
 ```{r CorrTable}
 #| label: tbl-correlations
 #| tab-cap: "Correlations between random effects. Values on the diagonal represent the posterior estimates of the standard deviation of each random effect."
-corr_est <- VarCorr(fit_E9_th_full)$ID
+corr_est <- VarCorr(fit_E2_th_final)$ID
 
-cormat <- matrix(NA, nrow = nrow(fixFX), ncol = nrow(fixFX))
+cormat <- matrix(NA, nrow = nrow(corr_est$sd), ncol = nrow(corr_est$sd))
 
 for (i in 1:dim(corr_est$cor)[3]){
   cormat[i,] <- corr_est$cor[,"Estimate",i]
@@ -938,48 +978,48 @@ knitr::kable(cormat, digits = 2)
 ```{r}
 #| label: fig-validity
 #| fig-cap: "Validity estimates of performance in the different conditions for the seperated processes."
-agg_data_validity <- agg_data %>% 
-  mutate(pC = correct/nTrials) %>% 
-  select(ID,Block,CTI_num,pC)
+agg_data_validity <- data %>%
+  dplyr::group_by(ID, Block, CTI_num) %>%
+  dplyr::summarise(
+    pC = sum(correct)/n(),
+    .groups = "drop"
+  )
 
-randFX_draws <- fit_E9_th_full %>% 
-  tidybayes::gather_draws(r_ID__Baseline[ID,],
-                          r_ID__Reflexive[ID,],
-                          r_ID__Saccade[ID,],
-                          r_ID__bindingAct[ID,term],
-                          r_ID__ActCue[ID,],
-                          r_ID__filterSpeed[ID,], ndraws = 100) %>% 
+randFX_draws <- fit_E2_th_final %>% 
+  tidybayes::gather_draws(r_ID__PercSpeed[ID,],
+                          r_ID__capture[ID,],
+                          r_ID__saccReq[ID,],
+                          r_ID__InhibReac[ID,], 
+                          r_ID__bindingAct[ID,],
+                          r_ID__arbBind[ID,],
+                          ndraws = 100) %>% 
   mutate(.variable = stringr::str_remove(.variable, "r_ID__"))
-randFX_draws$term[is.na(randFX_draws$term)] <- "Intercept"
-
-randFX_draws <- randFX_draws |> 
-  filter(term == "Intercept")
 
 randFX_draws <- randFX_draws %>% 
   tidyr::pivot_wider(names_from = c(.variable),
                      values_from = .value)
 
 df_validity = expand.grid(
-  ID = unique(agg_data$ID),
-  Block = unique(agg_data$Block),
-  CTI_num = unique(agg_data$CTI_num),
+  ID = unique(agg_data_validity$ID),
+  Block = unique(agg_data_validity$Block),
+  CTI_num = unique(agg_data_validity$CTI_num),
   .chain = unique(randFX_draws$.chain),
   .iteration = unique(randFX_draws$.iteration),
   .draw = unique(randFX_draws$.draw)
-) %>% left_join(agg_data_validity, by = c("ID","Block","CTI_num")) %>% 
-  left_join(randFX_draws, by = c("ID",".chain",".draw",".iteration"))
+) |> left_join(randFX_draws, by = c("ID",".chain",".draw",".iteration")) |> 
+  left_join(agg_data_validity, by = c("ID","Block","CTI_num"))
 
 df_cor <- df_validity %>% 
   group_by(Block, CTI_num, .draw) %>% 
   summarise(
-    SensoryDiscrimination = cor(pC, Baseline, use = "complete.obs"),
-    CueActivation = cor(pC, ActCue, use = "complete.obs"),
-    FilterSpeed = cor(pC, filterSpeed, use = "complete.obs"),
+    PercSpeed = cor(pC, PercSpeed, use = "complete.obs"),
+    InhibReac = cor(pC, InhibReac, use = "complete.obs"),
     Binding = cor(pC, bindingAct, use = "complete.obs"),
-    Reflexive = cor(pC, Reflexive, use = "complete.obs"),
-    Saccade = cor(pC, Saccade, use = "complete.obs"),
+    arbBind = cor(pC, arbBind, use = "complete.obs"),
+    Capture = cor(pC, capture, use = "complete.obs"),
+    Saccade = cor(pC, saccReq, use = "complete.obs"),
     .groups = "drop") %>% 
-  tidyr::pivot_longer(cols = c(SensoryDiscrimination, CueActivation, FilterSpeed, Binding, Reflexive, Saccade)) %>% 
+  tidyr::pivot_longer(cols = c(PercSpeed, InhibReac, Binding, arbBind, Capture, Saccade)) %>% 
   group_by(Block, CTI_num, name) %>% 
   summarise(
     mean = mean(value),
@@ -989,25 +1029,25 @@ df_cor <- df_validity %>%
 
 df_cor$process = "yes"
 
-df_cor[which(df_cor$name == "CueActivation"),]$process <- ifelse(
-  df_cor[which(df_cor$name == "CueActivation"),]$Block %in% inhib_blocks, "yes", "no")
-df_cor[which(df_cor$name == "FilterSpeed"),]$process <- ifelse(
-  df_cor[which(df_cor$name == "FilterSpeed"),]$Block %in% inhib_blocks, "yes", "no")
+df_cor[which(df_cor$name == "InhibReac"),]$process <- ifelse(
+  df_cor[which(df_cor$name == "InhibReac"),]$Block %in% inhib_blocks, "yes", "no")
 df_cor[which(df_cor$name == "Binding"),]$process <- ifelse(
   df_cor[which(df_cor$name == "Binding"),]$Block %in% bind_blocks, "yes", "no")
-df_cor[which(df_cor$name == "Reflexive"),]$process <- ifelse(
-  df_cor[which(df_cor$name == "Reflexive"),]$Block %in% SaccadeFromCue, "no", "yes")
+df_cor[which(df_cor$name == "arbBind"),]$process <- ifelse(
+  df_cor[which(df_cor$name == "arbBind"),]$Block %in% bind_blocks, "yes", "no")
+df_cor[which(df_cor$name == "Capture"),]$process <- ifelse(
+  df_cor[which(df_cor$name == "Capture"),]$Block %in% bottomup_blocks, "no", "yes")
 df_cor[which(df_cor$name == "Saccade"),]$process <- ifelse(
-  df_cor[which(df_cor$name == "Saccade"),]$Block %in% SaccadeFromFixation, "yes", "no")
+  df_cor[which(df_cor$name == "Saccade"),]$Block %in% saccade_blocks, "yes", "no")
 
 plot_validity <- ggplot(data = df_cor,
-                        aes(x = as.factor(CTI_num), y = mean, ymin = CIlow, ymax = CIhigh, color = Block, shape = process, alpha = process)) +
+                        aes(x = as.factor(CTI_num*1000), y = mean, ymin = CIlow, ymax = CIhigh, color = Block, shape = process, alpha = process)) +
   geom_point(position = position_dodge(0.5), size =2) +
   geom_errorbar(width = 0, position = position_dodge(0.5), linewidth = 1) +
   facet_wrap(~name) +
   geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
   scale_alpha_discrete(range = c(1/3,1)) +
-  labs(x = "Cue-Target Interval", y = "Validity (Correlation: Process with Prop. Corr)",
+  labs(x = "Cue-Target Interval (ms)", y = "Validity (Correlation: Process with Prop. Corr)",
        shape = "Process\n included:", alpha = "Process\n included:")
 
 ggsave(filename = "figures_E2/Validity_E9.jpg",plot_validity, dpi = 300, width = 7, height = 6)
@@ -1017,171 +1057,348 @@ knitr::include_graphics("figures_E2/Validity_E9.jpg")
 
 ## Relationship to Covariates
 
-As a preliminary estimate for relationships between WMC and processing speed with the different processes we dissociated in the manual saccade task, we computed correlations between the random effects estimated from the Bayesian GLM model and the latent factor scores extracted from the confirmatory factor models. @tbl-covcorr shows these correlations.
+```{r}
+#| label: fig-covcorr
+#| fig-cap: "Correlations of average performance in the different experimental blocks of the manual anti-saccade task with working memory capacity (WMC) and processing speed (PS). The points indicate the correlation coefficient and error bars the 95% confindence interval."
+df_corr_descriptive <- data %>%
+  dplyr::group_by(ID, Block) %>%
+  dplyr::summarise(
+    correct = sum(correct),
+    nTrials = dplyr::n(),
+    .groups = "drop"
+  ) |> left_join(COV_scores) |> 
+  group_by(Block) |> 
+  summarise(
+    r_WMC_mean = cor(WMC_g, correct/nTrials, use = "complete.obs"),
+    r_PS_mean = cor(v, correct/nTrials, use = "complete.obs"),
+    n_WMC = n() - sum(is.na(WMC_g)),
+    n_PS = n() - sum(is.na(v))
+  ) |> 
+  mutate(
+    r_WMC_upper = tanh(atanh(r_WMC_mean) + qnorm(.975) * (1/sqrt(n_WMC))),
+    r_WMC_lower = tanh(atanh(r_WMC_mean) + qnorm(.025) * (1/sqrt(n_WMC))),
+    r_PS_upper = tanh(atanh(r_PS_mean) + qnorm(.975) * (1/sqrt(n_PS))),
+    r_PS_lower = tanh(atanh(r_PS_mean) + qnorm(.025) * (1/sqrt(n_PS)))
+  ) |> 
+  tidyr::pivot_longer(cols = c(r_WMC_mean, r_PS_mean, r_WMC_upper, r_WMC_lower, r_PS_upper, r_PS_lower), names_to = "Covariate", values_to = "Correlation") |> 
+  mutate(pred = stringr::str_split_i(Covariate, "_", 2),
+         stat = stringr::str_split_i(Covariate, "_", 3)) |> 
+  select(Block, pred, stat, Correlation) |>
+  tidyr::pivot_wider(names_from = c(stat), values_from = Correlation)
+df_corr_descriptive$pred <- as.factor(df_corr_descriptive$pred)
+levels(df_corr_descriptive$pred)
+
+plot_cor_descriptive <- ggplot(df_corr_descriptive,
+                               aes(y = mean, x = pred, ymin = lower, ymax = upper, color = Block)) +
+  geom_point(position = position_dodge(0.25), size = 2) +
+  geom_errorbar(width = 0, position = position_dodge(0.25)) +
+  labs(y = "Correlation", x = "Covariate") +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank())
+
+ggsave(filename = "figures_E2/DescCorrelation_E1.jpg",plot_cor_descriptive, dpi = 300, width = 4, height = 4)
+knitr::include_graphics("figures_E2/DescCorrelation_E1.jpg")
+```
+
+In @fig-covcorr the correlations of the average performance in the different experimental blocks of the manual anti-saccade task with the two covariates, working memory capacity (WMC) and processing speed (PS) are shown. As indicated by the 95% confidence intervals, the correlations with both covariates are all significantly different from zero for all experimental. Although this replicates previous studies that found correlations between performance in the manual anti-saccade task, these results indicate that processes shared between all tasks are likely underlying the relationship between performance in the anti-saccade task with the covariates. Otherwise, only performance in the anti-saccade block should correlate with the covariate.
+
+### Relationship of the theoretically assumed processes with WMC & PS
+
+As a preliminary estimate for relationships between the different processes we dissociated in the manual saccade task with WMC and processing speed, we computed correlations between the random effects estimated from the Bayesian GLM model and the latent factor scores extracted from the confirmatory factor models. @tbl-covcorr shows these correlations. These correlations indicate that WMC and PS are primarly correlated with individual differences in the speed of detecting the target letter (PercSpeed), and individual differences in the ability to use the cue location or color to performed controlled saccades towards the location the target appears in (Binding & arbBind). The correlations with the other processes are negligible.
+
 
 ```{r}
 #| label: tbl-covcorr
 #| tab-cap: "Overview of parameter estimates"
-
-randFX <- ranef(fit_E9_th_full)$ID
+randFX <- ranef(fit_E2_th_final)$ID
 
 df_randFX <- data.frame(
-  ID = as.numeric(row.names(randFX[,,"Baseline_Intercept"])),
-  Baseline = randFX[,"Estimate","Baseline_Intercept"],
-  Reflexive = randFX[,"Estimate","Reflexive_Intercept"],
-  Saccade = randFX[,"Estimate","Saccade_Intercept"],
-  ActCue = randFX[,"Estimate","ActCue_Intercept"],
-  Filter = randFX[,"Estimate","filterSpeed_Intercept"],
-  Bind = randFX[,"Estimate","bindingAct_Intercept"],
-  Bind_arb = randFX[,"Estimate","bindingAct_bindArb1"]
+  ID = as.numeric(row.names(randFX[,,"PercSpeed_Intercept"])),
+  PercSpeed = randFX[,"Estimate","PercSpeed_Intercept"],
+  InhibReac = randFX[,"Estimate","InhibReac_Intercept"],
+  Binding = randFX[,"Estimate","bindingAct_Intercept"],
+  arbBind = randFX[,"Estimate","arbBind_Intercept"],
+  Saccade = randFX[,"Estimate","saccReq_Intercept"],
+  bottomUp = randFX[,"Estimate","capture_Intercept"]
 )
 
 df_randFX <- df_randFX %>% left_join(COV_scores)
-covmat_pred <- round(cor(df_randFX[,c(2:7,9,12)], use = "complete.obs"),2)
+covmat_pred <- round(cor(df_randFX[,c(2:8,11)], use = "complete.obs"),2)
 covmat_pred[upper.tri(covmat_pred)] <- ""
 knitr::kable(covmat_pred[7:8,1:6], digits = 2)
 ```
 
-```{r}
+```{r Covariate_formulas}
 cov_formulas <- list(
- WMC = bf(correct | trials(nTrials) ~ PercSpeed - 
-                      inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
-                      binding * ((bindingAct + bindArb * arbBind) * CTI_num) +
-                      bottomup * capture +
-                      saccade * saccReq +
-                      goalMain * FixDur_num,
-                    PercSpeed  ~ 1 + WMC + (1 | r | ID),
-                    goalMain   ~ 1 + WMC + (1 | r | ID),
-                    capture    ~ 1 + WMC + (1 | r | ID),
-                    saccReq    ~ 1 + WMC + (1 | r | ID),
-                    InhibPro   ~ 1 + WMC + (1 | r | ID),
-                    InhibReac  ~ 1 + WMC + (1 | r | ID),
-                    bindingAct ~ 1 + WMC + (1 | r | ID),
-                    arbBind    ~ 1 + WMC + (1 | r | ID),
-                    nl = TRUE),
- PS = bf(correct | trials(nTrials) ~ PercSpeed - 
+  WMC_all = bf(correct | trials(nTrials) ~ PercSpeed - 
+                 inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                 binding * ((bindingAct + bindArb * arbBind) * CTI_num) +
+                 bottomup * capture +
+                 saccade * saccReq +
+                 goalMain * FixDur_num,
+               PercSpeed  ~ 1 + WMC + (1 | r | ID),
+               goalMain   ~ 1,
+               capture    ~ 1 + WMC + (1 | r | ID),
+               saccReq    ~ 1 + WMC + (1 | r | ID),
+               InhibPro   ~ 1,
+               InhibReac  ~ 1 + WMC + (1 | r | ID),
+               bindingAct ~ 1 + WMC + (1 | r | ID),
+               arbBind    ~ 1 + WMC + (1 | r | ID),
+               nl = TRUE),
+  WMC_SpeedBind = bf(correct | trials(nTrials) ~ PercSpeed - 
+                       inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                       binding * ((bindingAct + bindArb * arbBind) * CTI_num) +
+                       bottomup * capture +
+                       saccade * saccReq +
+                       goalMain * FixDur_num,
+                     PercSpeed  ~ 1 + WMC + (1 | r | ID),
+                     goalMain   ~ 1,
+                     capture    ~ 1 + (1 | r | ID),
+                     saccReq    ~ 1 + (1 | r | ID),
+                     InhibPro   ~ 1,
+                     InhibReac  ~ 1 + (1 | r | ID),
+                     bindingAct ~ 1 + WMC + (1 | r | ID),
+                     arbBind    ~ 1 + WMC + (1 | r | ID),
+                     nl = TRUE),
+  WMC_SpeedBindInhib = bf(correct | trials(nTrials) ~ PercSpeed - 
+                            inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                            binding * ((bindingAct + bindArb * arbBind) * CTI_num) +
+                            bottomup * capture +
+                            saccade * saccReq +
+                            goalMain * FixDur_num,
+                          PercSpeed  ~ 1 + WMC + (1 | r | ID),
+                          goalMain   ~ 1,
+                          capture    ~ 1 + (1 | r | ID),
+                          saccReq    ~ 1 + (1 | r | ID),
+                          InhibPro   ~ 1,
+                          InhibReac  ~ 1 + WMC + (1 | r | ID),
+                          bindingAct ~ 1 + WMC + (1 | r | ID),
+                          arbBind    ~ 1 + WMC + (1 | r | ID),
+                          nl = TRUE),
+  PS_all = bf(correct | trials(nTrials) ~ PercSpeed - 
+                inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                binding * ((bindingAct + bindArb * arbBind) * CTI_num) +
+                bottomup * capture +
+                saccade * saccReq +
+                goalMain * FixDur_num,
+              PercSpeed  ~ 1 + v + (1 | r | ID),
+              goalMain   ~ 1,
+              capture    ~ 1 + v + (1 | r | ID),
+              saccReq    ~ 1 + v + (1 | r | ID),
+              InhibPro   ~ 1,
+              InhibReac  ~ 1 + v + (1 | r | ID),
+              bindingAct ~ 1 + v + (1 | r | ID),
+              arbBind    ~ 1 + v + (1 | r | ID),
+              nl = TRUE),
+  PS_SpeedBind = bf(correct | trials(nTrials) ~ PercSpeed - 
                       inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
                       binding * ((bindingAct + bindArb * arbBind) * CTI_num) +
                       bottomup * capture +
                       saccade * saccReq +
                       goalMain * FixDur_num,
                     PercSpeed  ~ 1 + v + (1 | r | ID),
-                    goalMain   ~ 1 + v + (1 | r | ID),
-                    capture    ~ 1 + v + (1 | r | ID),
-                    saccReq    ~ 1 + v + (1 | r | ID),
-                    InhibPro   ~ 1 + v + (1 | r | ID),
-                    InhibReac  ~ 1 + v + (1 | r | ID),
+                    goalMain   ~ 1,
+                    capture    ~ 1 + (1 | r | ID),
+                    saccReq    ~ 1 + (1 | r | ID),
+                    InhibPro   ~ 1,
+                    InhibReac  ~ 1 + (1 | r | ID),
                     bindingAct ~ 1 + v + (1 | r | ID),
                     arbBind    ~ 1 + v + (1 | r | ID),
-                    nl = TRUE)
+                    nl = TRUE),
+  PS_SpeedBindInhib = bf(correct | trials(nTrials) ~ PercSpeed - 
+                           inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                           binding * ((bindingAct + bindArb * arbBind) * CTI_num) +
+                           bottomup * capture +
+                           saccade * saccReq +
+                           goalMain * FixDur_num,
+                         PercSpeed  ~ 1 + v + (1 | r | ID),
+                         goalMain   ~ 1,
+                         capture    ~ 1 + (1 | r | ID),
+                         saccReq    ~ 1 + (1 | r | ID),
+                         InhibPro   ~ 1,
+                         InhibReac  ~ 1 + v + (1 | r | ID),
+                         bindingAct ~ 1 + v + (1 | r | ID),
+                         arbBind    ~ 1 + v + (1 | r | ID),
+                         nl = TRUE)
 )
 
-fit_E9_th_PS <- brms::brm(model_th_PS,
-                          data = agg_data,
-                          family = model_family,
-                          backend = "cmdstanr",
-                          chains = nChains,
-                          iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
-                          prior = theoretical_priors,
-                          save_pars = save_pars(all = T),
-                          sample_prior = T,
-                          file = "fit_Exp9_th_PS",
-                          file_refit = "on_change")
-
-fit_E9_th_WMC <- brms::brm(model_th_WMC,
+for(i in 1:length(cov_formulas)) {
+  model_name <- names(cov_formulas)[i]
+  model_formula = cov_formulas[[i]]
+  
+  priors <- theoretical_priors
+  
+  fitted_model <- brms::brm(model_formula,
+                            data = agg_data,
+                            family = model_family,
+                            backend = "cmdstanr",
+                            chains = nChains,
+                            iter = warmup_samples + postwarmup_samples, 
+                            warmup = warmup_samples,
+                            prior = priors,
+                            save_pars = save_pars(all = T),
+                            file = paste0("modelFits_E2/fit_E2_", model_name),
+                            file_refit = "on_change")
+  
+  prior_model <- brms::brm(model_formula,
                            data = agg_data,
                            family = model_family,
                            backend = "cmdstanr",
                            chains = nChains,
-                           iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
-                           prior = theoretical_priors,
+                           iter = warmup_samples + postwarmup_samples, 
+                           warmup = warmup_samples,
+                           prior = priors,
                            save_pars = save_pars(all = T),
-                           sample_prior = T,
-                           file = "fit_Exp9_th_WMC",
+                           sample_prior = "only",
+                           file = paste0("modelFits_E2/fit_E2_", model_name,"_prior"),
                            file_refit = "on_change")
-
-fit_E9_th_PS_prior <- brms::brm(model_th_PS,
-                                data = agg_data,
-                                family = model_family,
-                                backend = "cmdstanr",
-                                chains = nChains,
-                                iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
-                                prior = theoretical_priors,
-                                save_pars = save_pars(all = T),
-                                sample_prior = "only",
-                                file = "fit_Exp9_th_PS_prior",
-                                file_refit = "on_change")
-
-fit_E9_th_WMC_prior <- brms::brm(model_th_WMC,
-                                 data = agg_data,
-                                 family = model_family,
-                                 backend = "cmdstanr",
-                                 chains = nChains,
-                                 iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
-                                 prior = theoretical_priors,
-                                 save_pars = save_pars(all = T),
-                                 sample_prior = "only",
-                                 file = "fit_Exp9_th_WMC_prior",
-                                 file_refit = "on_change")
+  
+  if (!file.exists(paste("modelFits_E2/bridge_E2_", model_name, ".rds", sep = ""))) {
+    bridge <- bridge_sampler(fitted_model, cores = 4, repetitions = 10)
+    saveRDS(bridge, paste("modelFits_E2/bridge_E2_", model_name, ".rds", sep = ""))
+  }
+}
 ```
 
+```{r BayesFactors_Covariates}
+marginalLL_cov <- list()
+for(i in 1:length(cov_formulas)) {
+  model_name <- names(cov_formulas)[i]
+  model_formula = cov_formulas[[i]]
+  marginalLL_cov[[i]] <- readRDS(paste("modelFits_E2/bridge_E2_", model_name, ".rds", sep = ""))
+}
+names(marginalLL_cov) <- names(cov_formulas)
 
-```{r BayesFactors}
-BF_Baseline_WMC <- exp(bf_pars_th_WMC$log_BF[bf_pars_th_WMC$Parameter == "b_Baseline_WMC_g"])
-BF_Binding_WMC <- exp(bf_pars_th_WMC$log_BF[bf_pars_th_WMC$Parameter == "b_bindingAct_WMC_g"])
-BF_Baseline_v <- exp(bf_pars_th_PS$log_BF[bf_pars_th_PS$Parameter == "b_Baseline_v"])
-BF_Binding_v <- exp(bf_pars_th_PS$log_BF[bf_pars_th_PS$Parameter == "b_bindingAct_v"])
+bf_covariates <- data.frame(
+  reference = character(12),
+  comparison = character(12),
+  median_bf = numeric(12),
+  min_bf = numeric(12),
+  max_bf = numeric(12)
+)
+
+i <- 1
+for(cov in c("WMC","PS")) {
+  cov_models <- grep(cov, names(marginalLL_cov), value = T)
+  
+  for(model in cov_models){
+    bf <- bayes_factor(marginalLL[["th_final"]], marginalLL_cov[[model]])
+    
+    bf_covariates$reference[i] <- "th_final"
+    bf_covariates$comparison[i] <- model
+    
+    bf_covariates$median_bf[i] <- bf$bf_median_based
+    bf_covariates$min_bf[i] <- min(bf$bf)
+    bf_covariates$max_bf[i] <- max(bf$bf)
+    
+    i <- i + 1
+    if(which(model == cov_models) != length(cov_models)) {
+      for(j in (which(model == cov_models)+1):length(cov_models)){
+        refernce_model = model
+        comparison_model = cov_models[j]
+        
+        bf <- bayes_factor(marginalLL_cov[[refernce_model]], marginalLL_cov[[comparison_model]])
+        
+        bf_covariates$reference[i] <- refernce_model
+        bf_covariates$comparison[i] <- comparison_model
+        
+        bf_covariates$median_bf[i] <- bf$bf_median_based
+        bf_covariates$min_bf[i] <- min(bf$bf)
+        bf_covariates$max_bf[i] <- max(bf$bf)
+        
+        i <- i + 1
+      }
+    }
+  }
+}
 ```
 
-To evaluate which of these relationships differs credibly from zero, we entered the factor scores of WMC and processing speed as covariates into the Bayesian GLM. The posterior credibility intervals, indicated a positive relationship between WMC and the Baseline performance as well as the binding activity (see @tbl-relationshipWMC). However, Bayes Factors indicated only moderate evidence for the relationship between WMC and Baseline performance, $BF_{10} = `r apa_num(BF_Baseline_WMC)`$, and inconclusive evidence for the relationship between WMC and binding activity, $BF_{10} = `r apa_num(BF_Binding_WMC)`$. @fig-relationshipsWMC illustrates the realtionship of WMC with the dissociated processes of the GLM.
+```{r}
+fit_E2_WMC_all <- readRDS("modelFits_E2/fit_E2_WMC_all.rds")
+fit_E2_WMC_all_priors <- readRDS("modelFits_E2/fit_E2_WMC_all_prior.rds")
+
+bf_WMC_parameters <- bayestestR::bayesfactor_parameters(fit_E2_WMC_all, prior = fit_E2_WMC_all_priors)
+bf_WMC_parameters <- bf_WMC_parameters[grepl("WMC",bf_WMC_parameters$Parameter),1:2]
+bf_WMC_parameters$BF <- exp(bf_WMC_parameters$log_BF)
+bf_WMC_parameters$Parameter <- gsub("b_", "", bf_WMC_parameters$Parameter)
+
+fit_E2_PS_all <- readRDS("modelFits_E2/fit_E2_PS_all.rds")
+fit_E2_PS_all_priors <- readRDS("modelFits_E2/fit_E2_PS_all_prior.rds")
+
+bf_PS_parameters <- bayestestR::bayesfactor_parameters(fit_E2_PS_all, prior = fit_E2_PS_all_priors)
+bf_PS_parameters <- bf_PS_parameters[grepl("v",bf_PS_parameters$Parameter),1:2]
+bf_PS_parameters$BF <- exp(bf_PS_parameters$log_BF)
+bf_PS_parameters$Parameter <- gsub("b_", "", bf_PS_parameters$Parameter)
+```
+
+To evaluate which of these relationships differs credibly from zero, we entered the factor scores of WMC and processing speed as covariates into the Bayesian GLM. For WMC as a covariate, the posterior credibility intervals, indicated a positive relationship between WMC and perceptual speed as well as the binding strength (see @tbl-relationshipWMC). However, Bayes Factors indicated inconclusive evidence for the relationship between WMC and perceptual speed, but strong evidence for the relationship between WMC and binding activity. @fig-relationshipsWMC illustrates the relationship of WMC with the dissociated processes of the GLM.
 
 ```{r}
 #| label: tbl-relationshipWMC
 #| tab-cap: "Parameters estimates for the relationship of WMC and processes in the manual anti-saccade task"
-fixFX_WMC <- fixef(fit_E9_th_WMC)
+fixFX_WMC <- fixef(fit_E2_WMC_all)
 WMC_cols <- grepl("_WMC",rownames(fixFX_WMC))
-knitr::kable(round(fixFX_WMC[WMC_cols,c("Estimate","Q2.5","Q97.5")],2))
+fixFX_WMC <- as.data.frame(fixFX_WMC[WMC_cols,c("Estimate","Q2.5","Q97.5")])
+fixFX_WMC$Parameter <- rownames(fixFX_WMC)
+
+fixFX_WMC <- fixFX_WMC |> left_join(bf_WMC_parameters, by = "Parameter") |> 
+  select(Parameter, Estimate, Q2.5, Q97.5, BF)
+knitr::kable(fixFX_WMC, digits = 2)
 ```
 
 ```{r}
 #| label: fig-relationshipsWMC
 #| fig-cap: "Relationship between the processes dissociated in the Manual Anti-Saccade task and WMC"
 #| fig-subcap:
-#|   - "Baseline Performance"
-#|   - "Cue Activation"
-#|   - "Filtering"
-#|   - "Binding" 
+#|   - "Perceptual Speed"
+#|   - "Bottom Up Capture" 
+#|   - "Saccade Required"
+#|   - "Inhibition: Reactive"
+#|   - "Binding"
+#|   - "Binding: Arbitrary" 
 #| layout-ncol: 2
-#| layout-nrow: 2
-conditional_effects(fit_E9_th_WMC, nlpar = "Baseline", effect = "WMC_g")
-conditional_effects(fit_E9_th_WMC, nlpar = "ActCue", effect = "WMC_g")
-conditional_effects(fit_E9_th_WMC, nlpar = "filterSpeed", effect = "WMC_g")
-conditional_effects(fit_E9_th_WMC, nlpar = "bindingAct", effect = "WMC_g")
+#| layout-nrow: 3
+conditional_effects(fit_E2_WMC_all, nlpar = "PercSpeed", effect = "WMC")
+conditional_effects(fit_E2_WMC_all, nlpar = "capture", effect = "WMC")
+conditional_effects(fit_E2_WMC_all, nlpar = "saccReq", effect = "WMC")
+conditional_effects(fit_E2_WMC_all, nlpar = "InhibReac", effect = "WMC")
+conditional_effects(fit_E2_WMC_all, nlpar = "bindingAct", effect = "WMC")
+conditional_effects(fit_E2_WMC_all, nlpar = "arbBind", effect = "WMC")
 ```
 
-For processing speed, posterior credibility intervals indicated a positive relationship with Baseline performance as well as binding activity (see @tbl-relationshipPS). In this case, Bayes Factors indicated inconclusive evidence for the relationship with Baseline performance, $BF_{10} = `r apa_num(BF_Baseline_v)`$, and strong evidence for the relationship with binding activity, $BF_{10} = `r apa_num(BF_Binding_v)`$. @fig-relationshipsPS illustrates the realtionship of processing speed with the dissociated processes of the GLM.
+For processing speed, posterior credibility intervals indicated a positive relationship with Baseline performance as well as binding activity (see @tbl-relationshipPS). In this case, Bayes Factors indicated inconclusive evidence for the relationship with Baseline performance and strong evidence for the relationship with binding activity. @fig-relationshipsPS illustrates the relationship of processing speed with the dissociated processes of the GLM.
 
 ```{r}
 #| label: tbl-relationshipPS
-#| tab-cap: "Parameters estimates for the relationship of processing speed (drift rate v) and processes in the manual anti-saccade task"
-fixFX_PS <- fixef(fit_E9_th_PS)
+#| tab-cap: "Unstandardized parameters estimates for the relationship of processing speed (drift rate: v) and the dissociated processes in the manual anti-saccade task"
+fixFX_PS <- fixef(fit_E2_PS_all)
 PS_cols <- grepl("_v",rownames(fixFX_PS))
-knitr::kable(fixFX_PS[WMC_cols,c("Estimate","Q2.5","Q97.5")], digits = 2)
+fixFX_PS <- as.data.frame(fixFX_PS[PS_cols,c("Estimate","Q2.5","Q97.5")])
+fixFX_PS$Parameter <- rownames(fixFX_PS)
+
+fixFX_PS <- fixFX_PS |> left_join(bf_PS_parameters, by = "Parameter") |> 
+  select(Parameter, Estimate, Q2.5, Q97.5, BF)
+knitr::kable(fixFX_PS, digits = 2)
 ```
 
 ```{r}
 #| label: fig-relationshipsPS
 #| fig-cap: "Relationship between the processes dissociated in the Manual Anti-Saccade task and processing speed (measured with drift rate v)"
 #| fig-subcap:
-#|   - "Baseline Performance"
-#|   - "Cue Activation"
-#|   - "Filtering"
-#|   - "Binding" 
+#|   - "Perceptual Speed"
+#|   - "Bottom Up Capture" 
+#|   - "Saccade Required"
+#|   - "Inhibition: Reactive"
+#|   - "Binding"
+#|   - "Binding: Arbitrary" 
 #| layout-ncol: 2
-#| layout-nrow: 2
-conditional_effects(fit_E9_th_PS, nlpar = "Baseline", effect = "v")
-conditional_effects(fit_E9_th_PS, nlpar = "ActCue", effect = "v")
-conditional_effects(fit_E9_th_PS, nlpar = "filterSpeed", effect = "v")
-conditional_effects(fit_E9_th_PS, nlpar = "bindingAct", effect = "v")
+#| layout-nrow: 3
+conditional_effects(fit_E2_PS_all, nlpar = "PercSpeed", effect = "v")
+conditional_effects(fit_E2_PS_all, nlpar = "capture", effect = "v")
+conditional_effects(fit_E2_PS_all, nlpar = "saccReq", effect = "v")
+conditional_effects(fit_E2_PS_all, nlpar = "InhibReac", effect = "v")
+conditional_effects(fit_E2_PS_all, nlpar = "bindingAct", effect = "v")
+conditional_effects(fit_E2_PS_all, nlpar = "arbBind", effect = "v")
 ```
 

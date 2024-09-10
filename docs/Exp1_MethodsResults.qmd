@@ -158,10 +158,14 @@ To incorporate the theoretical assumptions outlined in the introduction, we spec
 Formally, this resulted in the following model:
 
 $$
-p_{correct} = PercSpeed - A_{cue} * e^{-f*CTI} + A_{binding} * CTI
+\begin{align}
+\lambda_{j,k,l} &= b_{PercSpeed} + Inhib_j * b_{InhibPro} * e^{-b_{InhibReact}*CTI_k} + Binding_j + b_{Binding} * CTI_k \\
+&= + Saccade_j * b_{Saccade} + BottomUp_j * b_{BottomUp} + GoalMain_j * b_{GoalMain} * PrepTime_l; \\
+p_{j,k,l} &= \frac{1}{1 + e^{-\lambda_{j,k,l}}}
+\end{align}
 $$
 
-For an illustration of these theoretically informed processes, see @fig-theory. Specifically, the black line represents baseline performance independent of the above mentioned processes, that is performance in the Random Saccade Block. The differences at time 0 between the black and the red line represents the automatic activation of the cue, that declines exponentially towards the black line with time. The green line represents the use of binding information over time that improves performance with longer CTI duration. As this model was implemented on the logit-scale, the increases in performance on the probability scale are non-linear for binding benefits as a result of the logit link function.
+For an illustration of these theoretically informed processes, see @fig-theory. Specifically, the dashed black line represents baseline performance if all of the above mentioned processes are not required. The differences at time 0 between the black and the red line represents the automatic activation of the cue, the smaller this difference the better the proactive inhibition of automatic saccades elicited by the onset of the cue. This cue activation declines exponentially towards the black line with time, reflective re-active inhibition. The green line represents the use of binding information over time that improves performance with longer CTI duration. As this model was implemented on the logit-scale, the increases in performance on the probability scale are non-linear for binding benefits as a result of the logit link function.
 
 ```{r Fig_TheoreticalModel}
 #| label: fig-theory
@@ -200,42 +204,43 @@ BasePerformance <- function(x, Baseline, scale = "prob") {
 
 
 ggplot() +
-  xlim(0,4) +
+  xlim(0,1) +
   geom_function(fun = expDecay,
-                args = list(Baseline = 1.43, ActCue = 0.5, filterSpeed = 0.5, scale = "logit"),
+                args = list(Baseline = 1.43, ActCue = 0.5, filterSpeed = 2.5, scale = "logit"),
                 color = "darkred")  +
   geom_function(fun = linBinding,
-                args = list(Baseline = 1.43, bindingAct = 0.2, scale = "logit"),
+                args = list(Baseline = 1.43, bindingAct = 0.5, scale = "logit"),
                 color = "darkgreen") +
   geom_function(fun = BasePerformance,
                 args = list(Baseline = 1.43, scale = "logit"),
                 linetype = "dashed") +
   labs(y = "logit(p)",
-       x = "CTI duration",
+       x = "CTI duration (s)",
        title = "Theoretical Model (Logit Scale)") +
   theme_bw() +
   theme(panel.grid.major.x  = element_blank(),
         panel.grid.minor.x = element_blank())
 
 ggplot() +
-  xlim(0,4) +
+  xlim(0,1) +
   geom_function(fun = expDecay,
-                args = list(Baseline = 1.43, ActCue = 0.62, filterSpeed = 0.5),
+                args = list(Baseline = 1.43, ActCue = 0.5, filterSpeed = 2.5),
                 color = "darkred")  +
   geom_function(fun = linBinding,
-                args = list(Baseline = 1.43, bindingAct = 0.20),
+                args = list(Baseline = 1.43, bindingAct = 0.5),
                 color = "darkgreen") +
   geom_function(fun = BasePerformance,
-                args = list(Baseline = 1.43)) +
+                args = list(Baseline = 1.43),
+                linetype = "dashed") +
   labs(y = "Proportion Correct",
-       x = "CTI duration",
+       x = "CTI duration (s)",
        title = "Theoretical Model (Probability Scale)") +
   theme_bw() +
   theme(panel.grid.major.x  = element_blank(),
         panel.grid.minor.x = element_blank())
 ```
 
-In addition, we included additive effects on the Baseline performance that reflected if a condition required that a saccade needed to be made away from the fixation or from the cue. This reflects differences between the NoSaccade condition and the Central Saccade condition. These effects were independent from the other theoretically motivated effects.
+In addition, we included additive effects that reflected if a condition required that a saccade needed to be made away from the fixation or from the cue. This reflects differences between the NoSaccade condition and the Central Saccade condition. These effects were independent from the other theoretically motivated effects.
 
 ```{r LinearModel}
 model_sat <- bf(correct | trials(nTrials) ~ 
@@ -364,6 +369,21 @@ model_th_noBindSD <- bf(correct | trials(nTrials) ~ PercSpeed -
                         bindingAct ~ 1,
                         nl = TRUE)
 
+model_th_final <- bf(correct | trials(nTrials) ~ PercSpeed - 
+                          inhibition * (InhibPro * exp(-exp(InhibReac)*CTI_num)) + 
+                          binding * (bindingAct * CTI_num) +
+                          bottomup * capture +
+                          saccade * saccReq +
+                          goalMain * FixDur_num,
+                        PercSpeed  ~ 1 + (1 | r | ID),
+                        goalMain   ~ 1,
+                        capture    ~ 1 + (1 | r | ID),
+                        saccReq    ~ 1 + (1 | r | ID),
+                        InhibPro   ~ 1,
+                        InhibReac  ~ 1 + (1 | r | ID),
+                        bindingAct ~ 1 + (1 | r | ID),
+                        nl = TRUE)
+
 model_th_reduced <- bf(correct | trials(nTrials) ~ PercSpeed - 
                          inhibition * (InhibPro * exp(-InhibReac*CTI_num)) + 
                          binding * (bindingAct * CTI_num) +
@@ -388,7 +408,8 @@ all_model_formulas <- list(saturated = model_sat,
                            noInhProSD =model_th_noInhProSD, 
                            noInhReSD = model_th_noInhReSD, 
                            noBindSD = model_th_noBindSD, 
-                           reduced = model_th_reduced)
+                           reduced = model_th_reduced,
+                           th_final = model_th_final)
 ```
 
 For all model parameters, we used moderately informative normal priors centered on zero with a standard deviation of one. Parameters were estimated with four independent MCMC chains retaining 10000 samples for each chain after 2000 warm-up samples.
@@ -462,7 +483,7 @@ plot_data <- data %>%
   )
 
 desc_plot <- ggplot(data = plot_data,
-                    aes(x = as.factor(CTI_num*100), y = correct/nTrials, color = as.factor(Block), fill = as.factor(Block), 
+                    aes(x = as.factor(CTI_num*1000), y = correct/nTrials, color = as.factor(Block), fill = as.factor(Block), 
                         group = as.factor(Block), shape = as.factor(bottomup))) +
   facet_grid(inhibition ~ binding, labeller = label_both) +
   ggplot2::geom_jitter(position = ggplot2::position_jitterdodge(jitter.width = jitter_width, dodge.width = plot_dodge),
@@ -481,13 +502,11 @@ desc_plot <- ggplot(data = plot_data,
 ggsave(filename = "figures_E1/E1_Descriptives.jpg",desc_plot, dpi = 300, width = 7, height = 6)
 ```
 
-![Average performance in the different experimental blocks for different CTI durations.](figures_E1/E1_Descriptives.jpg){#fig-descriptive}
+![Average performance (circles and triangles) in the five experimental conditions for each level of CTI duration in Experiment 1. Conditions are grouped into panels by whether they require inhibition of a saccade (rows) and whether they afford using stimulus-response bindings between cue and target location to anticipate the target location (columns). The point clouds around each mean represent the subject estimates, and the dashed red line represents chance performance.  ](figures_E1/E1_Descriptives.jpg){#fig-descriptive}
 
 ## GLM: Accuracy
 
 ```{r FitModel}
-fitted_models <- list()
-marginalLL <- list()
 for(i in 1:length(all_model_formulas)) {
   model_name <- names(all_model_formulas)[i]
   model_formula = all_model_formulas[[i]]
@@ -500,7 +519,7 @@ for(i in 1:length(all_model_formulas)) {
     priors <- theoretical_priors
   }
   
-  fitted_models[[i]] <- brms::brm(model_formula,
+  fitted_model <- brms::brm(model_formula,
                                   data = agg_data,
                                   family = model_family,
                                   backend = "cmdstanr",
@@ -512,30 +531,7 @@ for(i in 1:length(all_model_formulas)) {
                                   file = paste0("modelFits_E1/fit_E1_", model_name),
                                   file_refit = "on_change")
   
-  if (!file.exists(paste("modelFits_E1/bridge_E1_", model_name, ".rds", sep = ""))) {
-    bridge <- bridge_sampler(fitted_models[[i]], cores = 4, repetitions = 10)
-    saveRDS(bridge, paste("modelFits_E1/bridge_E1_", model_name, ".rds", sep = ""))
-  } else {
-    bridge <- readRDS(paste("modelFits_E1/bridge_E1_", model_name, ".rds", sep = ""))
-  }
-  
-  marginalLL[[i]] <- bridge
-}
-
-prior_models <- list()
-for(i in 1:length(all_model_formulas)) {
-  model_name <- names(all_model_formulas)[i]
-  model_formula = all_model_formulas[[i]]
-  
-  if (model_name == "saturated") {
-    priors <- sat_priors
-  } else if(model_name == "reduced") {
-    priors <- theoretical_priors_reduced
-  } else {
-    priors <- theoretical_priors
-  }
-  
-  prior_models[[i]] <- brms::brm(model_formula,
+  prior_model <- brms::brm(model_formula,
                                  data = agg_data,
                                  family = model_family,
                                  backend = "cmdstanr",
@@ -547,48 +543,82 @@ for(i in 1:length(all_model_formulas)) {
                                  save_pars = save_pars(all = T),
                                  file = paste0("modelFits_E1/fit_E1_", model_name,"_priors"),
                                  file_refit = "on_change")
+  
+  if (!file.exists(paste("modelFits_E1/bridge_E1_", model_name, ".rds", sep = ""))) {
+    bridge <- bridge_sampler(fitted_model, cores = 4, repetitions = 10)
+    saveRDS(bridge, paste("modelFits_E1/bridge_E1_", model_name, ".rds", sep = ""))
+  }
 }
 
+rm(fitted_model, prior_model, bridge)
+```
+
+```{r BayesFactors SD}
+marginalLL <- list()
+for(i in 1:length(all_model_formulas)) {
+  model_name <- names(all_model_formulas)[i]
+  model_formula = all_model_formulas[[i]]
+  marginalLL[[i]] <- readRDS(paste("modelFits_E1/bridge_E1_", model_name, ".rds", sep = ""))
+}
+names(marginalLL) <- names(all_model_formulas)
+
+noSD_models <- names(marginalLL)[grepl("SD",names(marginalLL))]
+bf_noSD <- data.frame(
+  sd = noSD_models,
+  median_bf = NaN,
+  min_bf = NaN,
+  max_bf = NaN
+)
+
+for(i in 1:length(noSD_models)) {
+  bf <- bayes_factor(marginalLL[["th_full"]], marginalLL[[noSD_models[i]]])
+  
+  bf_noSD$median_bf[i] <- bf$bf_median_based
+  bf_noSD$min_bf[i] <- min(bf$bf)
+  bf_noSD$max_bf[i] <- max(bf$bf)
+}
+```
+
+
+```{r ModelComparison}
+bf_final <- bayes_factor(marginalLL$th_full, marginalLL$th_final)
+
+fit_E1_th_full <- readRDS("~/Documents/GitHub/AntiSaccade/docs/modelFits_E1/fit_E1_th_full.rds")
+fit_E1_th_full_priors <- readRDS("~/Documents/GitHub/AntiSaccade/docs/modelFits_E1/fit_E1_th_full_priors.rds")
+
+fit_E1_th_final <- readRDS("~/Documents/GitHub/AntiSaccade/docs/modelFits_E1/fit_E1_th_final.rds")
+fit_E1_th_final_priors <- readRDS("~/Documents/GitHub/AntiSaccade/docs/modelFits_E1/fit_E1_th_final_priors.rds")
+
+fit_E1_saturated <- readRDS("~/Documents/GitHub/AntiSaccade/docs/modelFits_E1/fit_E1_saturated.rds")
 
 # Test if parameters differ from zero
-bf_pars <- bayestestR::bayesfactor_parameters(fit_E5_th_full,
-                                              prior = fit_E5_th_full_prior)
+bf_pars <- bayestestR::bayesfactor_parameters(fit_E1_th_final,
+                                              prior = fit_E1_th_final_priors)
 
 # test if there is evidence for filtering
-bf_filter <- bayes_factor(marginalLL$full, marginalLL$reduced)
+bf_filter <- bayes_factor(marginalLL$noInhProSD, marginalLL$reduced)
 
 # extract fixed effect for theoretical model
-fixFX <- round(fixef(fit_E5_th_full),2)
+fixFX <- round(fixef(fit_E1_th_full),2)
 
-newdata <- expand.grid(
+# plot posterior predictives: saturated model
+newdata_saturated <- expand.grid(
   ID = unique(agg_data$ID),
   nTrials = 1,
   CTI_num = unique(agg_data$CTI_num),
   Block = unique(agg_data$Block)
 )
 
-newdata2 <- expand.grid(
-  ID = unique(agg_data$ID),
-  nTrials = 1,
-  CTI_num = unique(agg_data$CTI_num),
-  binding = unique(agg_data$binding),
-  inhibition = unique(agg_data$inhibition),
-  SaccadeFromCue = unique(agg_data$SaccadeFromCue),
-  SaccadeFromFixation = unique(agg_data$SaccadeFromFixation)
-) %>% 
-  left_join(Block2Conds) %>% 
-  filter(!is.na(Block))
-
-tidy_pred_sat <- fit_E5_sat %>% 
-  tidybayes::epred_draws(newdata = newdata, ndraws = 1000) %>% 
+tidy_pred_sat <- fit_E1_saturated %>% 
+  tidybayes::epred_draws(newdata = newdata_saturated, ndraws = 1000) %>% 
   group_by(ID, CTI_num, Block) %>% 
   summarise(predValue = mean(.epred)) %>% 
   left_join(Block2Conds) %>% 
   filter(!is.na(Block))
 
 pp_plot_sat <- ggplot(data = tidy_pred_sat,
-                      aes(x = as.factor(CTI_num), y = predValue, color = as.factor(Block), fill = as.factor(Block), 
-                          group = as.factor(Block), shape = as.factor(SaccadeFromCue))) +
+                      aes(x = as.factor(CTI_num*1000), y = predValue, color = as.factor(Block), fill = as.factor(Block), 
+                          group = as.factor(Block), shape = as.factor(bottomup))) +
   facet_grid(inhibition ~ binding, labeller = label_both) +
   ggplot2::geom_jitter(position = ggplot2::position_jitterdodge(jitter.width = jitter_width, dodge.width = plot_dodge),
                        alpha = point_alpha) +
@@ -596,26 +626,42 @@ pp_plot_sat <- ggplot(data = tidy_pred_sat,
   ggplot2::stat_summary(geom = "line", fun = "mean", position = ggplot2::position_dodge(plot_dodge)) +
   stat_summary(geom = "point", fun = mean, position = position_dodge(plot_dodge),
                data = agg_data, color = "black", shape = "cross",
-               aes(x = as.factor(CTI_num), y = correct/nTrials)) +
+               aes(x = as.factor(CTI_num*1000), y = correct/nTrials)) +
   geom_hline(yintercept = 0.33, color = "red", linetype = "dashed") +
   labs(x = "Cue-Target Interval",
        y = "Proportion Correct",
        color = "Block", fill = "Block",
        shape = "Pos Cue = Target",
-       title = "Posterior Predictives (sat)") +
-  coord_cartesian(ylim = c(0,1))
-ggsave(filename = "PostPredictives_sat_E5.jpg",pp_plot_sat, dpi = 300, width = 7, height = 6)
+       title = "Posterior Predictives (Saturated)") +
+  coord_cartesian(ylim = c(0,1)) + theme_bw() +
+  theme(panel.grid.major.x = element_blank())
+ggsave(filename = "figures_E1/PostPredictives_Saturated_E1.jpg",pp_plot_sat, dpi = 300, width = 7, height = 6)
 
-tidy_pred_theoretical <- fit_E5_th_full %>% 
-  tidybayes::epred_draws(newdata = newdata2, ndraws = 1000) %>% 
-  group_by(ID, CTI_num, binding, inhibition, SaccadeFromCue, SaccadeFromFixation) %>% 
+
+newdata_theoretical <- expand.grid(
+  ID = unique(agg_data$ID),
+  nTrials = 1,
+  CTI_num = unique(agg_data$CTI_num),
+  FixDur_num = unique(agg_data$FixDur_num),
+  binding = unique(agg_data$binding),
+  inhibition = unique(agg_data$inhibition),
+  saccade = unique(agg_data$saccade),
+  bottomup = unique(agg_data$bottomup)
+) %>% 
+  left_join(Block2Conds) %>% 
+  filter(!is.na(Block))
+
+
+tidy_pred_theoretical <- fit_E1_th_full %>% 
+  tidybayes::epred_draws(newdata = newdata_theoretical, ndraws = 1000) %>% 
+  group_by(ID, CTI_num, binding, inhibition, saccade, bottomup) %>% 
   summarise(predValue = mean(.epred)) %>% 
   left_join(Block2Conds) %>% 
   filter(!is.na(Block))
 
 pp_plot_theoretical <- ggplot(data = tidy_pred_theoretical,
-                              aes(x = as.factor(CTI_num), y = predValue, color = as.factor(Block), fill = as.factor(Block), 
-                                  group = as.factor(Block), shape = as.factor(SaccadeFromCue))) +
+                              aes(x = as.factor(CTI_num*1000), y = predValue, color = as.factor(Block), fill = as.factor(Block), 
+                                  group = as.factor(Block), shape = as.factor(bottomup))) +
   facet_grid(inhibition ~ binding, labeller = label_both) +
   ggplot2::geom_jitter(position = ggplot2::position_jitterdodge(jitter.width = jitter_width, dodge.width = plot_dodge),
                        alpha = point_alpha) +
@@ -623,35 +669,38 @@ pp_plot_theoretical <- ggplot(data = tidy_pred_theoretical,
   stat_summary(position = position_dodge(plot_dodge), fun.data = mean_se) +
   stat_summary(geom = "point", fun = mean, position = position_dodge(plot_dodge),
                data = agg_data, color = "black", shape = "cross",
-               aes(x = as.factor(CTI_num), y = correct/nTrials)) +
+               aes(x = as.factor(CTI_num*1000), y = correct/nTrials)) +
   geom_hline(yintercept = 0.33, color = "red", linetype = "dashed") +
-  labs(x = "Cue-Target Interval (in 1/100 ms)",
+  labs(x = "Cue-Target Interval (in ms)",
        y = "Proportion Correct",
        color = "Block", fill = "Block",
        shape = "Pos Cue = Target",
        title = "Posterior Predictives (Theoretical)") +
-  coord_cartesian(ylim = c(0,1))
-ggsave(filename = "PostPredictives_Theoretical_E5.jpg",pp_plot_theoretical, dpi = 300, width = 7, height = 6)
-```
-
-```{r, include=FALSE, echo = FALSE}
-gc()
+  coord_cartesian(ylim = c(0,1)) + theme_bw() +
+  theme(panel.grid.major.x = element_blank())
+ggsave(filename = "figures_E1/PostPredictives_Theoretical_E1.jpg",pp_plot_theoretical, dpi = 300, width = 7, height = 6)
 ```
 
 ### Experimental Effects
 
-![Posterior predictives of the average proportion correct as a function of CTI duration. The black crosses indicate the observed average proportion correct based on the data.](PostPredictives_Theoretical_E5.jpg){#fig-predictive}
+![Posterior predictives of the average proportion correct as a function of CTI duration. The black crosses indicate the observed average proportion correct. The point cloud around the posterior means represent the subject estimates in each condition, and the dashed red line indicates guessing performance.](figures_E1/PostPredictives_Theoretical_E1.jpg){#fig-predictive}
 
 @fig-predictive shows the posterior predictive estimates from the Bayesian GLM for the different experimental blocks and the changes in performance across the different CTI levels on the proportion correct scale. The theoretical model fits adequately to the observed data, as indicated by the black crosses in the plot that closely overlay with the posterior means estimated from the GLM.
 
-First, we evaluated if there was evidence for the different theoretically assumed processes contributing to performance in the manual Anti-Saccade task. The results indicated that there was credible automatic activation of cues, $b_{Acue} = `r fixFX["ActCue_Intercept","Estimate"]`$, 95% CI = $[`r fixFX["ActCue_Intercept","Q2.5"]`;`r fixFX["ActCue_Intercept","Q97.5"]`]$, $BF_{10} =$ `r printnum(exp(bf_pars[which(bf_pars[,"Parameter"] == "b_ActCue_Intercept"),"log_BF"]), format = "g")`, which weakened with longer CTI duration, $b_{filter} = `r round(exp(fixFX["filterSpeed_Intercept","Estimate"]),2)`$, 95% CI = $[`r exp(fixFX["filterSpeed_Intercept","Q2.5"])`;`r exp(fixFX["filterSpeed_Intercept","Q97.5"])`]$, $BF_{10} =$ `r printnum( bf_filter[["bf_median_based"]], format = "g")`. Likewise, an informative association of the cue to the location of the target location improved performance with longer CTI duration, $b_{binding} = `r fixFX["bindingAct_Intercept","Estimate"]`$, 95% CI = $[`r fixFX["bindingAct_Intercept","Q2.5"]`;`r fixFX["bindingAct_Intercept","Q97.5"]`]$, $BF_{10} =$ `r printnum(exp(bf_pars[which(bf_pars[,"Parameter"] == "b_bindingAct_Intercept"),"log_BF"]), format = "g")`. In addition, both having to perform a saccade, $b_{saccade} = `r fixFX["Saccade_Intercept","Estimate"]`$, 95% CI = $[`r fixFX["Saccade_Intercept","Q2.5"]`;`r fixFX["Saccade_Intercept","Q97.5"]`]$, $BF_{10} =$ `r printnum(exp(bf_pars[which(bf_pars[,"Parameter"] == "b_Saccade_Intercept"),"log_BF"]), format = "g")`, and the benefit of the reflexive saccade to the cue already indicating the target location, $b_{reflexive} = `r fixFX["Reflexive_Intercept","Estimate"]`$, 95% CI = $[`r fixFX["Reflexive_Intercept","Q2.5"]`;`r fixFX["Reflexive_Intercept","Q97.5"]`]$, $BF_{10} =$ `r printnum(exp(bf_pars[which(bf_pars[,"Parameter"] == "b_Reflexive_Intercept"),"log_BF"]), format = "g")`, resulted in worse performance. A summary of parameter estimates is displayed in @tbl-parameters.
+First, we evaluated if there was evidence for the different theoretically assumed processes contributing to performance in the manual anti-Saccade task. There was a credible effect of the need to inhibit a reflexive saccade, $b_{InhibPro} = `r fixFX["InhibPro_Intercept","Estimate"]`$, 95% CI = $[`r fixFX["InhibPro_Intercept","Q2.5"]`;`r fixFX["InhibPro_Intercept","Q97.5"]`]$, $BF_{10} =$ `r printnum(exp(bf_pars[which(bf_pars[,"Parameter"] == "b_InhibPro_Intercept"),"log_BF"]), format = "g")`, which weakened with longer CTI duration, $b_{InhibReac} = `r round(exp(fixFX["InhibReac_Intercept","Estimate"]),2)`$, 95% CI = $[`r exp(fixFX["InhibReac_Intercept","Q2.5"])`;`r exp(fixFX["InhibReac_Intercept","Q97.5"])`]$, $BF_{10} =$ `r printnum( bf_filter[["bf_median_based"]], format = "g")`. Likewise, a regular relationship between the cue and the location of the target improved performance with longer CTI duration, $b_{Binding} = `r fixFX["bindingAct_Intercept","Estimate"]`$, 95% CI = $[`r fixFX["bindingAct_Intercept","Q2.5"]`;`r fixFX["bindingAct_Intercept","Q97.5"]`]$, $BF_{10} =$ `r printnum(exp(bf_pars[which(bf_pars[,"Parameter"] == "b_bindingAct_Intercept"),"log_BF"]), format = "g")`. In addition, having to perform a saccade, $b_{saccade} = `r fixFX["saccReq_Intercept","Estimate"]`$, 95% CI = $[`r fixFX["saccReq_Intercept","Q2.5"]`;`r fixFX["saccReq_Intercept","Q97.5"]`]$, $BF_{10} =$ `r printnum(exp(bf_pars[which(bf_pars[,"Parameter"] == "b_saccReq_Intercept"),"log_BF"]), format = "g")`. resulted in worse performance. Further, performance was better when cue and target location coincided, showing a benefit from being able to rely on automatic attraction of attention to the cue location, $b_{BottomUp} = `r fixFX["capture_Intercept","Estimate"]`$, 95% CI = $[`r fixFX["capture_Intercept","Q2.5"]`;`r fixFX["capture_Intercept","Q97.5"]`]$, $BF_{10} =$ `r printnum(exp(bf_pars[which(bf_pars[,"Parameter"] == "b_capture_Intercept"),"log_BF"]), format = "g")`, resulted in worse performance. There was also a credible benefit from a longer preparation interval, $b_{GoalMain} = `r fixFX["goalMain_Intercept","Estimate"]`$, 95% CI = $[`r fixFX["goalMain_Intercept","Q2.5"]`;`r fixFX["goalMain_Intercept","Q97.5"]`]$, $BF_{10} =$ `r printnum(exp(bf_pars[which(bf_pars[,"Parameter"] == "b_goalMain_Intercept"),"log_BF"]), format = "g")`. A summary of parameter estimates is displayed in @tbl-parameters.
 
 ```{r ParTable}
 #| label: tbl-parameters
 #| tab-cap: "Overview of parameter estimates"
 rownames(fixFX) <- stringr::str_remove(rownames(fixFX), "_Intercept")
-fixFX["filterSpeed",]<- exp(fixFX["filterSpeed",])
-knitr::kable(fixFX[,c("Estimate","Q2.5","Q97.5")], digits = 2)
+fixFX["InhibReac",]<- exp(fixFX["InhibReac",])
+
+corr_est <- VarCorr(fit_E1_th_full)$ID
+sdFX <- round(corr_est$sd,2)
+row.names(sdFX) <- stringr::str_remove(row.names(sdFX),"_Intercept")
+
+allFX <- cbind(fixFX, sdFX)
+knitr::kable(allFX[,c(1,3:5,7:8)], digits = 2)
 ```
 
 ### Individual Differences
@@ -660,35 +709,19 @@ knitr::kable(fixFX[,c("Estimate","Q2.5","Q97.5")], digits = 2)
 #| label: tbl-bfSD
 #| tab-cap: "Bayes Factors in favor of individual differences in the processes seperated."
 # test if there is evidence for individual differences in the different processes
-bf_noBaseSD <- bayes_factor(marginalLL$full, marginalLL$noBaseSD)
-bf_noSfFSD <- bayes_factor(marginalLL$full, marginalLL$noSfFSD)
-bf_noSfCSD <- bayes_factor(marginalLL$full, marginalLL$noSfCSD)
-bf_noAcSD <- bayes_factor(marginalLL$full, marginalLL$noAcSD)
-bf_noFSD <- bayes_factor(marginalLL$full, marginalLL$noFSD)
-bf_noBindSD <- bayes_factor(marginalLL$full, marginalLL$noBindSD)
-
-df_bf_SD <- data.frame(
-  process = c("Baseline","Saccade from Fixation", "Saccade From Cue", "Act: Cue", "Filtering", "Binding"),
-  median_bf = c(bf_noBaseSD$bf_median_based, bf_noSfFSD$bf_median_based, bf_noSfCSD$bf_median_based, bf_noAcSD$bf_median_based,
-                bf_noFSD$bf_median_based, bf_noBindSD$bf_median_based),
-  min_bf = c(min(bf_noBaseSD$bf), min(bf_noSfFSD$bf), min(bf_noSfCSD$bf), min(bf_noAcSD$bf),
-             min(bf_noFSD$bf), min(bf_noBindSD$bf)),
-  max_bf = c(max(bf_noBaseSD$bf), max(bf_noSfFSD$bf), max(bf_noSfCSD$bf), max(bf_noAcSD$bf),
-             max(bf_noFSD$bf), max(bf_noBindSD$bf))
-)
-knitr::kable(df_bf_SD, digits = 2)
+knitr::kable(bf_noSD)
 ```
 
-As the manual Anti-Saccade task is commonly used in individual differences research to measure how people differ in their ability to control attention and how this is related to other cognitive abilities, we also tested if there are credible individual differences in the processes we dissociated in our model. We did so by selectively fixing the random effect of one of the processes to zero and test if this model was favored over a model freely estimating the random effect. These analyses indicated that there was credible evidence for individual differences in all processes separated in the model (see @tbl-bfSD).
+As the manual Anti-Saccade task is commonly used in individual differences research to measure how people differ in their ability to control attention and how this is related to other cognitive abilities, we also tested if there are credible individual differences in the processes we dissociated in our model. The estimates for the standard deviation of the dissociated processes across individuals are shown in @tbl-parameters. As standard deviations were estimated with a lower bound of zero, we tested if random effects were credible by selectively fixing the random effect of one of the processes to zero and test if this model was favored over a model freely estimating the random effect. These analyses indicated that there was credible evidence for individual differences in all but two processes separated in the model (see @tbl-bfSD). Only for the random effect of goal maintenance and proactive inhibition of reflexive saccades, the Bayes Factors indicated that there was no or no consistent credible variation across individuals. Therefore, we fixed both these random effect to zero for the following analyses. The model with the fixed random effects was favored over the model with freely estimated random effects, $BF =$ `r printnum(1/bf_final$bf_median_based, format = "g")`.
 
-We also estimated the correlations between all random effects. @tbl-correlations shows the estimated standard deviations of all random effects and the correlations among them. Generally, correlations between random effects were small, most $|r_s| < .30$, except for the correlation between the Intercept of Baseline performance and the cost of having to performing a saccade towards the target, $r = -.59$, indicating that people that were good at discriminating the target letters overall exhibited larger costs for performing a saccade. However, the generally small correlations indicate that our theoretical model is able to isolate different cognitive processes underlying performance in the manual Anti-Saccade tasks.
+We estimated the correlations between the random effects that were retained in this final model. @tbl-correlations shows the estimated standard deviations of all random effects and the correlations among them. Generally, correlations between random effects were small, most $|r_s| < .30$, except for the correlation between perceptual speed and the cost of having to performing a saccade towards the target, $r = -.76$. However, the generally small correlations indicate that the different cognitive processes seperated in our theoretical model are mostly independent from one another.
 
 ```{r CorrTable}
 #| label: tbl-correlations
 #| tab-cap: "Correlations between random effects. Values on the diagonal represent the posterior estimates of the standard deviation of each random effect."
-corr_est <- VarCorr(fit_E5_th_full)$ID
+corr_est <- VarCorr(fit_E1_th_final)$ID
 
-cormat <- matrix(NA, nrow = nrow(fixFX), ncol = nrow(fixFX))
+cormat <- matrix(NA, nrow = nrow(corr_est$sd), ncol = nrow(corr_est$sd))
 
 for (i in 1:dim(corr_est$cor)[3]){
   cormat[i,] <- corr_est$cor[,"Estimate",i]
@@ -704,24 +737,27 @@ knitr::kable(cormat, digits = 2)
 
 ### Validity of the Anti-Saccade Task
 
-Since its conception the anti-saccade task was used as a measure for the ability to inhibit automatic saccade. To test if this is true, we investigated how strongly performance in the difference experimental conditions was related to the processes we dissociated in the GLM. 
+Since its conception the anti-saccade task was used as a measure for the ability to inhibit automatic saccade. To test if this is true, we investigated how strongly performance in the difference experimental conditions was related to the processes we dissociated in the GLM.
 
-@fig-validity shows correlations between the random effects of the processes separated in the GLM with the observed performance in the different experimental blocks. These correlations capture to what extend performance in one of the experimental blocks is a valid indicator for the processes. A process pure indicator would only correlate with one of the process measures. As is evident from the figure, none of the experimental blocks is a truly process pure indicator for a single process. With respect to the typical use of the anti-saccade task (using a CTI of 50ms), it is measuring at least three processes: sensory discrimination, the speed of filtering automatic activation, and binding ability. Any correlation with external covariates can thus stem from a correlation with any of these processes. This renders the interpretation of the predictive power of performance in the anti-saccade task complex to interpret with respect to the processes that is responsible for it.
+@fig-validity shows a summary of correlations between 100 random draws of the random effects of the processes separated in the GLM with the observed performance in the different experimental blocks. These correlations capture to what extend performance in one of the experimental blocks is a valid indicator for the processes. A process pure indicator would only correlate with one of the process measures. As is evident from the figure, none of the experimental blocks is a truly process pure indicator for a single process. With respect to the typical use of the anti-saccade task (using a CTI of 50ms), it is measuring at least three processes: 1) perceptual speed, 2) re-actively inhibiting the reflexive saccade elicited by the cue onset, and 3 binding ability. In consequence, any correlation of the anti-saccade task with external covariates can thus stem from a correlation with any of these processes. This renders the interpretation of the predictive power of performance in the anti-saccade task complex to interpret with respect to the processes that is responsible for it.
 
 ```{r}
 #| label: fig-validity
 #| fig-cap: "Validity estimates of performance in the different conditions for the seperated processes."
-agg_data_validity <- agg_data %>% 
-  mutate(pC = correct/nTrials) %>% 
-  select(ID,Block,CTI,pC)
+agg_data_validity <- data %>%
+  dplyr::group_by(ID, Block, CTI) %>%
+  dplyr::summarise(
+    pC = mean(correct),
+    .groups = "drop"
+  )
 
-randFX_draws <- fit_E5_th_full %>% 
-  tidybayes::gather_draws(r_ID__Baseline[ID,],
-                          r_ID__Reflexive[ID,],
-                          r_ID__Saccade[ID,],
+randFX_draws <- fit_E1_th_final %>% 
+  tidybayes::gather_draws(r_ID__PercSpeed[ID,],
+                          r_ID__capture[ID,],
+                          r_ID__saccReq[ID,],
+                          r_ID__InhibReac[ID,], 
                           r_ID__bindingAct[ID,],
-                          r_ID__ActCue[ID,],
-                          r_ID__filterSpeed[ID,], ndraws = 100) %>% 
+                          ndraws = 100) %>% 
   mutate(.variable = stringr::str_remove(.variable, "r_ID__"))
 
 randFX_draws <- randFX_draws %>% 
@@ -729,9 +765,9 @@ randFX_draws <- randFX_draws %>%
                      values_from = .value)
 
 df_validity = expand.grid(
-  ID = unique(agg_data$ID),
-  Block = unique(agg_data$Block),
-  CTI = unique(agg_data$CTI),
+  ID = unique(agg_data_validity$ID),
+  Block = unique(agg_data_validity$Block),
+  CTI = unique(agg_data_validity$CTI),
   .chain = unique(randFX_draws$.chain),
   .iteration = unique(randFX_draws$.iteration),
   .draw = unique(randFX_draws$.draw)
@@ -741,14 +777,13 @@ df_validity = expand.grid(
 df_cor <- df_validity %>% 
   group_by(Block, CTI, .draw) %>% 
   summarise(
-    SensoryDiscrimination = cor(pC, Baseline, use = "complete.obs"),
-    CueActivation = cor(pC, ActCue, use = "complete.obs"),
-    FilterSpeed = cor(pC, filterSpeed, use = "complete.obs"),
+    PercSpeed = cor(pC, PercSpeed, use = "complete.obs"),
+    InhibReac = cor(pC, InhibReac, use = "complete.obs"),
     Binding = cor(pC, bindingAct, use = "complete.obs"),
-    Reflexive = cor(pC, Reflexive, use = "complete.obs"),
-    Saccade = cor(pC, Saccade, use = "complete.obs"),
+    Capture = cor(pC, capture, use = "complete.obs"),
+    Saccade = cor(pC, saccReq, use = "complete.obs"),
     .groups = "drop") %>% 
-  tidyr::pivot_longer(cols = c(SensoryDiscrimination, CueActivation, FilterSpeed, Binding, Reflexive, Saccade)) %>% 
+  tidyr::pivot_longer(cols = c(PercSpeed, InhibReac, Binding, Capture, Saccade)) %>% 
   group_by(Block, CTI, name) %>% 
   summarise(
     mean = mean(value),
@@ -758,16 +793,14 @@ df_cor <- df_validity %>%
 
 df_cor$process = "yes"
 
-df_cor[which(df_cor$name == "CueActivation"),]$process <- ifelse(
-  df_cor[which(df_cor$name == "CueActivation"),]$Block %in% inhib_blocks, "yes", "no")
-df_cor[which(df_cor$name == "FilterSpeed"),]$process <- ifelse(
-  df_cor[which(df_cor$name == "FilterSpeed"),]$Block %in% inhib_blocks, "yes", "no")
+df_cor[which(df_cor$name == "InhibReac"),]$process <- ifelse(
+  df_cor[which(df_cor$name == "InhibReac"),]$Block %in% inhib_blocks, "yes", "no")
 df_cor[which(df_cor$name == "Binding"),]$process <- ifelse(
   df_cor[which(df_cor$name == "Binding"),]$Block %in% bind_blocks, "yes", "no")
-df_cor[which(df_cor$name == "Reflexive"),]$process <- ifelse(
-  df_cor[which(df_cor$name == "Reflexive"),]$Block %in% SaccadeFromCue, "no", "yes")
 df_cor[which(df_cor$name == "Saccade"),]$process <- ifelse(
-  df_cor[which(df_cor$name == "Saccade"),]$Block %in% SaccadeFromFixation, "yes", "no")
+  df_cor[which(df_cor$name == "Saccade"),]$Block %in% saccade_blocks, "yes", "no")
+df_cor[which(df_cor$name == "Capture"),]$process <- ifelse(
+  df_cor[which(df_cor$name == "Capture"),]$Block %in% bottomup_blocks, "yes", "no")
 
 plot_validity <- ggplot(data = df_cor,
                         aes(x = as.factor(CTI), y = mean, ymin = CIlow, ymax = CIhigh, color = Block, shape = process, alpha = process)) +
@@ -777,8 +810,10 @@ plot_validity <- ggplot(data = df_cor,
   geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
   scale_alpha_discrete(range = c(1/3,1)) +
   labs(x = "Cue-Target Interval", y = "Validity (Correlation: Process with Prop. Corr)",
-       shape = "Process\n included:", alpha = "Process\n included:")
+       shape = "Process\n included:", alpha = "Process\n included:") +
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank())
 
-ggsave(filename = "Validity_E5.jpg",plot_validity, dpi = 300, width = 7, height = 6)
-knitr::include_graphics("Validity_E5.jpg")
+ggsave(filename = "figures_E1/Validity_E1.jpg",plot_validity, dpi = 300, width = 7, height = 6)
+knitr::include_graphics("figures_E1/Validity_E1.jpg")
 ```
