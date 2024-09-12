@@ -33,7 +33,7 @@ point_alpha <- 0.1
 In this study, we again isolated different processes contributing to performance in the manual anti saccade task. We added another condition to more directly isolate procedural binding strength and additionally, we measured individual differences in working memory capacity (WMC) and processing speed (PS) to investigate which of the processes required in the manual anti-saccade task was related to PS and WMC.
 
 ```{r load_data, include=FALSE}
-data <- RawData_Exp9  %>% filter(CTI != 200)
+data <- Exp2_data %>% filter(CTI != 200)
 nSub_total <- length(unique(data$ID))
 data$CTI_num <- (data$CTI)/1000
 data$CTI <- as.factor(data$CTI)
@@ -96,7 +96,7 @@ We recruited `r papaja::printnum(nSub_total)` participants via Prolific, `r papa
 
 ## Tasks
 
-All tasks were again programmed in lab.js (Henninger et al., 2020) and run via JATOS. The tasks were run locally on the participants machines, but we required that the a laptop or desktop computer was used.[^1] Participation using a tablet or smartphone was not allowed. All tasks were run in a single session that lasted approximately 90 to 100 minutes. In between tasks participants were allowed to take breaks. For all participants the session started with the manual saccade task, followed by switching between one of the  working memory task and processing task until all tasks were completed.
+All tasks were again programmed in lab.js (Henninger et al., 2020) and run via JATOS. The tasks were run locally on the participants machines, but we required that the a laptop or desktop computer was used.[^1] Participation using a tablet or smartphone was not allowed. All tasks were run in a single session that lasted approximately 90 to 100 minutes. In between tasks participants were allowed to take breaks. For all participants the session started with the manual saccade task, followed by switching between one of the working memory task and processing task until all tasks were completed.
 
 [^1]: In the supplementary experiment 7 (S7), we investigated if experimental manipulations in the manual anti-saccade task are comparable when performing it on a laptop and desktop computer. The results indicated that there were no differences in the experimental effects. Our goal with this study was to investigate to what extend differences in the devices used could impact the experimental effects as well as individual differences in the manual anti-saccade task.
 
@@ -126,7 +126,7 @@ We also noticed, that in the first experiment performance was better (Average PC
 ### Working Memory Tasks
 
 ```{r Prep_WMCdata}
-data_WMC <- Exp9_WorkingMemory
+data_WMC <- Exp2_WMC_data
 
 # extract PCA scores for WMC
 data_CS_proc <- Exp9_WorkingMemory %>% 
@@ -217,7 +217,7 @@ We discarded subjects that did not perform the processing task or were below 70%
 
 ```{r Prep_PSdata}
 # load data of covariates
-data_PS <- Exp9_ProcSpeed
+data_PS <- Exp2_PS_data
 
 data_HT <- Exp9_ProcSpeed %>% 
   filter(task == "HT")
@@ -695,7 +695,6 @@ names(table_data)[which(names(table_data) == "CTI_num")] <- "CTI"
 knitr::kable(table_data,digits = 2)
 ```
 
-
 ```{r TableDesc}
 #| label: tbl-descriptivesFixDur
 #| tab-cap: "Desciptive statistiscs for the proportion correct in the different experimental conditions and each Fixation duration condition."
@@ -933,8 +932,6 @@ bf_inhibreac <- bayes_factor(marginalLL[["noInhReSD"]], marginalLL[["reduced"]])
 min_bf_parameters <- min(c(exp(bf_pars_th_full$log_BF[which(bf_pars_th_full$Parameter != "b_InhibReac_Intercept")]), bf_inhibreac$bf_median_based))
 ```
 
-
-
 ### Experimental Effects
 
 ![](figures_E2/PostPredictives_theoretical_E2.jpg){#fig-predictive}
@@ -1080,7 +1077,6 @@ ggsave(filename = "figures_E2/Validity_E2.jpg",plot_validity, dpi = 300, width =
 knitr::include_graphics("figures_E2/Validity_E2.jpg")
 ```
 
-
 ## Relationship to Covariates
 
 ```{r}
@@ -1132,7 +1128,6 @@ In @fig-covcorr the correlations of the average performance in the different exp
 ### Relationship of the theoretically assumed processes with WMC & PS
 
 As a preliminary estimate for relationships between the different processes we dissociated in the manual saccade task with WMC and processing speed, we computed correlations between the random effects estimated from the Bayesian GLM model and the latent factor scores extracted from the confirmatory factor models. @tbl-covcorr shows these correlations. These correlations indicate that WMC and PS are primarly correlated with individual differences in the speed of detecting the target letter (PercSpeed), and individual differences in the ability to use the cue location or color to performed controlled saccades towards the location the target appears in (Binding & arbBind). The correlations with the other processes are negligible.
-
 
 ```{r}
 #| label: tbl-covcorr
@@ -1427,4 +1422,3 @@ conditional_effects(fit_E2_PS_all, nlpar = "InhibReac", effect = "v")
 conditional_effects(fit_E2_PS_all, nlpar = "bindingAct", effect = "v")
 conditional_effects(fit_E2_PS_all, nlpar = "arbBind", effect = "v")
 ```
-

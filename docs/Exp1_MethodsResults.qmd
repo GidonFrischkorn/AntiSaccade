@@ -31,7 +31,7 @@ point_alpha <- 0.1
 # Methods
 
 ```{r data_prep}
-data <- RawData_Exp5
+data <- Exp1_data
 nSub_total <- length(unique(data$ID))
 data$CTI_num <- (data$CTI)/1000
 data$CTI <- as.factor(data$CTI)

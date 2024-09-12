@@ -1,0 +1,222 @@
+---
+title: "Supplementary Experiment 3: Method & Results"
+format: html
+editor: visual
+embed-resources: TRUE
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r options, include = FALSE}
+knitr::opts_chunk$set(
+  eval = TRUE,
+  echo = FALSE,
+  output = TRUE,
+  warning = FALSE,
+  error = FALSE,
+  message = FALSE,
+  collapse = TRUE
+)
+```
+
+```{r setup, include = FALSE}
+pacman::p_load(AntiSaccade, papaja, brms, dplyr, ggplot2)
+options(mc.cores = parallel::detectCores())
+
+# plot settings
+plot_dodge <- 1
+jitter_width <- 1
+point_alpha <- 0.1
+```
+
+# Methods
+```{r load_data, include=FALSE}
+data <- SuppExp3_data
+nSub <- length(unique(data$ID))
+data$CTI_num <- (data$CTI)/1000
+data$CTI <- as.factor(data$CTI)
+data$SOA_num <- (data$SOA)/1000
+data$SOA_num[data$SOA_num > 0.25] <- 0.15
+data$SOA <- as.factor(data$SOA)
+data$RTms <- data$RTms + 150
+data$TargetSimCue <- ifelse(data$CTI_num == 0, 1, 0)
+```
+
+## Participants
+
+We recruited `r papaja::printnum(nSub)` participant via Prolific. Participants were required to be 18 to 40 years old, speak German as their first language, and have an approval rate of at least 90% when participating in studies on Prolific. 
+
+## Design
+
+The goal of the present study was to better understand how participants treat the cue and its location in the Random saccade block. For this, we compared the Random Saccade Block from Supplementary Experiment 1 and 2 to a central cueing block with either 3 or 4 out of the four possible peripheral position the target could appear in highlighted by boxes.
+
+## Manual Saccade Task
+
+In this experiment we changed the types of blocks compared to supplementary experiments 1 and 2. We removed the Pro- and Anti-Saccade block and added two blocks with a central cue. The two central cueing blocks either had 3 or 4 of the four peripheral locations that the target could appear in. Additionally, we varied the CTI duration in three steps from -250, -100, to 50 and 400 ms. The fixation duration was again varied in 5 steps from 200 to 1800ms in steps of 400ms. Apart from that, the baisc task and its instruction remained the same. So, participants indicated which letters they detected by pressing the according letter "P", "B", or "R" on the keyboard. We recorded the response given as well as the response time as the time between onset of the target stimulus until the response.
+
+In each block we ran 240 trials. Thus, each of the three letters, appeared once in each of the four peripheral locations with each of the four fixation durations and five CTIs.
+
+## Data Analysis
+
+```{r include=FALSE}
+n_full <- nrow(data)
+data <- data %>% filter(RTms > 150, RTms < 10000)
+n_filter <- nrow(data)
+
+prop_filter <- (1 - n_filter/n_full) * 100
+```
+
+Prior to data analysis we removed trials with reaction times shorter than 50 ms and longer than 5000ms. This resulted in discarding `r papaja::printnum(prop_filter)`% of data.
+
+We analyzed the number of correct responses with a Bayesian Generalized Linear Model assuming the number of correct responses to follow a binomial distribution. We used a logit link function, thus estimating the linear model on the logit-scale. The model was estimated using the R package `brms`.
+
+```{r model_family}
+model_family <- brmsfamily("binomial", link = "logit")
+```
+
+Specifically, we estimated the mean performance in each block at the shortest CTI duration as separate intercepts. We then included a linear CTI effect for each Block to estimate changes in performance as CTIs get longer. We included random effects for the intercepts and linear CTI effects in each Block. For all parameters, we used moderately informative logistic priors centered on zero with a scale on one. We estimated parameter with four independent MCMC chains retaining 10000 samples for each chain after 2000 warmup samples.
+
+```{r LinearModel}
+linear_model <- bf(correct | trials(nTrials) ~ Baseline + soa*SOA_num + cti*CTI_num + StimTargetSyn * TargetSimCue,
+                   Baseline ~ 0 + Block + (0 + Block | ID),
+                   soa ~ 0 + Block + (0 + Block || ID),
+                   cti ~  0 + Block + (0 + Block || ID),
+                   StimTargetSyn ~ 0 + Block + (0 + Block || ID),
+                   nl = TRUE)
+```
+
+```{r Priors}
+model_priors <- prior("logistic(0,1)", class = b, nlpar = Baseline) +
+  prior("logistic(0,1)", class = b, nlpar = soa) +
+  prior("logistic(0,1)", class = b, nlpar = cti) +
+  prior("logistic(0,1)", class = b, nlpar = StimTargetSyn)
+```
+
+```{r sampling_settings}
+nChains <- 4
+warmup_samples <- 2000
+postwarmup_samples <- 10000
+```
+
+# Results
+
+## Descriptives
+
+```{r Agg_data, include=FALSE}
+agg_data <- data |> 
+  group_by(ID, Block, SOA, SOA_num, CTI, CTI_num, TargetSimCue) |> 
+  summarise(correct = sum(correct), nTrials = n(), .groups = "drop")
+```
+
+```{r TableDesc, echo=FALSE, fig.align='center', out.width="80%"}
+#| label: tbl-descriptivesCTI
+#| tab-cap: "Desciptive statistiscs for the proportion correct in the different experimental conditions and each CTI condition."
+table_data <- agg_data %>% 
+  group_by(Block, SOA_num) %>% 
+  summarise(Mean = mean(correct/nTrials),
+            SD = sd(correct/nTrials),
+            Min = min(correct/nTrials),
+            Max = max(correct/nTrials),
+            .groups = "drop") %>% 
+  mutate(SOA_num = as.factor(round( (SOA_num)*1000)))
+
+names(table_data)[which(names(table_data) == "SOA_num")] <- "SOA"
+
+knitr::kable(table_data, digits = 2)
+```
+
+The summary statistics for the Proportion of correct responses in the three different blocks for all CTI duration is given in \@ref(tab:TableDesc). Figure \@ref(fig:FigDesc) displays the changes of performance across the different conditions and includes performance of each subject in each of the conditions.
+
+```{r FigDesc}
+#| label: fig-descriptive
+#| fig-cap: "Average performance in the three experimental conditions for each level of CTI duration."
+plot_data <- data |> 
+  group_by(ID, Block, SOA_num) |> 
+  summarise(pC = sum(correct)/n(), .groups = "drop")
+
+ggplot(data = plot_data,
+       aes(x = as.factor((SOA_num) * 1000), y = pC, color = Block, group = Block)) +
+  stat_summary(position = position_dodge(plot_dodge)) +
+  stat_summary(geom = "line", fun = mean, position = position_dodge(plot_dodge)) +
+  geom_jitter(alpha = point_alpha, position = position_jitterdodge(jitter.width = jitter_width, dodge.width = plot_dodge)) +
+  labs(x = "Cue-Target Interval",
+       y = "Proportion Correct",
+       color = "Block", fill = "Block",
+       shape = "Pos Cue = Target",
+       title = "Descriptive Plot") +
+  coord_cartesian(ylim = c(0,1)) +
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank())
+```
+
+
+## GLM: Accuracy
+
+```{r FitModel, echo=FALSE}
+fit_SuppExp3_saturated<- brms::brm(linear_model,
+                                   data = agg_data,
+                                   family = model_family,
+                                   backend = "cmdstanr",
+                                   chains = nChains,
+                                   iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
+                                   prior = model_priors,
+                                   save_pars = save_pars(all = T),
+                                   sample_prior = T,
+                                   file = "modelFits_SuppExp/fit_SuppExp3_saturated",
+                                   file_refit = "on_change")
+```
+
+(ref:post-pred) Posterior predictives of the average proportion correct as a function of CTI duration in the three experimental blocks.
+
+```{r PredEffects}
+#| label: fig-PredEffects
+#| fig-cap: "Posterior predictives of the average proportion correct as a function of CTI duration in the three experimental blocks."
+newdata <- data.frame(
+  ID = agg_data$ID,
+  nTrials = 1,
+  Block = agg_data$Block,
+  SOA_num = agg_data$SOA_num,
+  CTI_num = agg_data$CTI_num,
+  TargetSimCue = agg_data$TargetSimCue
+)
+
+tidy_pred_saturated <- fit_SuppExp3_saturated %>% 
+  tidybayes::epred_draws(newdata = newdata, ndraws = 1000) %>% 
+  group_by(ID, SOA_num, CTI_num, Block) %>% 
+  summarise(predValue = mean(.epred)) |> 
+  mutate(SOA = SOA_num + CTI_num)
+
+ggplot(data = tidy_pred_saturated,
+       aes(y = predValue, x = as.factor((SOA_num + CTI_num) * 1000), 
+           color = as.factor(Block), group = as.factor(Block))) +
+  geom_jitter(alpha = point_alpha, position = position_jitterdodge(jitter.width = jitter_width, dodge.width = plot_dodge)) +
+  stat_summary(position = position_dodge(plot_dodge)) +
+  stat_summary(geom = "line", fun = mean, position = position_dodge(plot_dodge)) +
+  stat_summary(data = agg_data, aes(x = as.factor((SOA_num + CTI_num) * 1000), y = correct/nTrials),
+               geom = "point", fun = mean, position = position_dodge(plot_dodge), 
+               color = "black", shape = "cross", size = 3) +
+  geom_hline(yintercept = 1/3, color = "darkred", linetype = "dashed") +
+  labs(x = "Cue-Target Interval (in ms)",
+       y = "Proportion Correct",
+       color = "Block", fill = "Block") +
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank())
+```
+
+```{r echo=FALSE}
+hyp_fit <- c(Cen3_Cen4 = "Baseline_BlockCentral3 = Baseline_BlockCentral4",
+             Cen3_Ran = "Baseline_BlockCentral3 = Baseline_BlockRandom",
+             Ran_Cen4 = "Baseline_BlockRandom = Baseline_BlockCentral4",
+             SOA_Cen3 = "soa_BlockCentral3 = 0",
+             SOA_Cen4 = "soa_BlockCentral4 = 0",
+             SOA_Ran = "soa_BlockRandom = 0",
+             CTI_Cen3 = "cti_BlockCentral3 = 0",
+             CTI_Cen4 = "cti_BlockCentral4 = 0",
+             CTI_Ran = "cti_BlockRandom = 0")
+
+hyp_results <- hypothesis(fit_SuppExp3_saturated,hyp_fit)
+```
+
+Figure @fig-PredEffects shows the posterior predictive estimates from the Bayesian GLM for the different experimental blocks and the linear effect of CTI on the proportion correct scale. Comparisons of the posterior estimates indicated that at the shortest CTI (50ms) performance in the Central3-Saccade Block was equal in the Central4-Saccade, $BF_{01}$ = `r printnum(hyp_results$hypothesis$Evid.Ratio[1], format = "g")`. For the comparions of performance at the shortest CTI between the Random and the two Central blocks there was no conclusive evidence, $BF_{01}$ = `r printnum(abs(hyp_results$hypothesis$Evid.Ratio[2]), format = "g")`, and the Central4-Block, $BF_{01}$ = `r printnum(abs(hyp_results$hypothesis$Evid.Ratio[3]), format = "g")`. 
+
+For all three blocks there was strong evidence in favor of a positive effect of the CTI on performance, Central3: $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[4]), format = "g")`, Central4: $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[5]), format = "g")`, Random: $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[6]), format = "g")`. When comparing the effect of CTI between the blocks, we found strong evidence of the CTI effects beeing equal when compared pairwise, `r printnum(min(abs(hyp_results$hypothesis$Evid.Ratio[7:9])), format = "g")` < $BF_{01}$ < `r printnum(max(abs(hyp_results$hypothesis$Evid.Ratio[7:9])), format = "g")`.
