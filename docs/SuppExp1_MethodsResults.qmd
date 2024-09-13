@@ -10,7 +10,7 @@ editor_options:
 ```{r options, include = FALSE}
 knitr::opts_chunk$set(
   eval = TRUE,
-  echo = FALSE,
+  echo = TRUE,
   output = TRUE,
   warning = FALSE,
   error = FALSE,
@@ -20,7 +20,8 @@ knitr::opts_chunk$set(
 ```
 
 ```{r setup}
-pacman::p_load(AntiSaccade, papaja, brms, dplyr, ggplot2)
+pacman::p_load_gh("GidonFrischkorn/AntiSaccade")
+pacman::p_load(papaja, brms, dplyr, ggplot2)
 options(mc.cores = parallel::detectCores())
 
 # plot settings
@@ -216,11 +217,11 @@ hyp_fit <- c(Pro_Ant = "BlockPro = BlockAnti",
 hyp_results <- hypothesis(fit_SuppExp1_saturated,hyp_fit)
 ```
 
-@fig-PredEffects shows the posterior predictive estimates from the Bayesian GLM for the different experimental blocks and the linear effect of CTI on the proportion correct scale. Comparisons of the posterior estimates (see @tbl-parameters) indicated that at the shortest CTI (50ms) performance in the Pro-Saccade Block was better than in both the Anti-Saccade, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[1]), format = "g")`, and the Random-Saccade block, , $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[2]), format = "g")`. Although descriptively performance in the Anti-Saccade block was lower than in the Random-Saccade Block, there was inconclusive evidence with respect to performance being different in these two blocks at the shortest CTI condition, $BF_{01}$ = `r printnum(abs(hyp_results$hypothesis$Evid.Ratio[3]), format = "g")`.
+@fig-PredEffects shows the posterior predictive estimates from the Bayesian GLM for the different experimental blocks and the linear effect of CTI on the proportion correct scale. Comparisons of the posterior estimates (see @tbl-parameters) indicated that at the shortest CTI (50ms) performance in the Pro-Saccade Block was better than in both the Anti-Saccade, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[1]), format = "e")`, and the Random-Saccade block, , $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[2]), format = "e")`. Although descriptively performance in the Anti-Saccade block was lower than in the Random-Saccade Block, there was inconclusive evidence with respect to performance being different in these two blocks at the shortest CTI condition, $BF_{01}$ = `r printnum(abs(hyp_results$hypothesis$Evid.Ratio[3]), format = "e")`.
 
-For both the Pro-Saccade, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[4]), format = "e")`, and the Anti-Saccade Block, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[5]), format = "g")`, there was strong evidence in favor of a linear effect of CTI, leading to better performance for longer CTIs. There was inconclusive evidence for the CTI effect being equal for these two blocks, $BF_{01}$ = `r printnum(abs(hyp_results$hypothesis$Evid.Ratio[7]), format = "g")`. For the Random-Saccade Block there was moderate evidence in favor of an effect of CTI on performance, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[6]), format = "g")`.
+For both the Pro-Saccade, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[4]), format = "e")`, and the Anti-Saccade Block, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[5]), format = "g")`, there was strong evidence in favor of a linear effect of CTI, leading to better performance for longer CTIs. For the Random-Saccade Block there was moderate evidence in favor of an effect of CTI on performance, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[6]), format = "e")`.
 
-The CTI effect was larger in the Anti-Saccade Block than in the Random-Saccade block,  $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[9]), format = "e")`, but there was no conclusive evidence with respect to the difference of the CTI effect between the Anti- and Pro-Saccade Block, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[7]), format = "g")`. Likewise there was inconclusive evidenve with respect to the difference between the CTI effect in the Pro- and Random-Saccade block, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[8]), format = "e")`.
+The CTI effect was larger in the Anti-Saccade Block than in the Random-Saccade block,  $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[9]), format = "e")`, but there was no conclusive evidence with respect to the difference of the CTI effect between the Anti- and Pro-Saccade Block, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[7]), format = "e")`. Likewise there was inconclusive evidenve with respect to the difference between the CTI effect in the Pro- and Random-Saccade block, $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[8]), format = "e")`.
 
 ```{r Table_Parameters}
 #| label: tbl-parameters
@@ -237,5 +238,3 @@ colnames(sdFX) <- stringr::str_replace(colnames(sdFX), "Estimate","Random Effect
 allFX <- cbind(fixFX, sdFX)
 knitr::kable(allFX[,c(1,3:5,7:8)], digits = 2)
 ```
-
-## Summary

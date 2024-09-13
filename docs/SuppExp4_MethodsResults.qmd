@@ -1,5 +1,5 @@
 ---
-title: "Supplementary Experiment 3: Method & Results"
+title: "Supplementary Experiment 4: Method & Results"
 format: html
 editor: visual
 embed-resources: TRUE
@@ -10,7 +10,7 @@ editor_options:
 ```{r options, include = FALSE}
 knitr::opts_chunk$set(
   eval = TRUE,
-  echo = FALSE,
+  echo = TRUE,
   output = TRUE,
   warning = FALSE,
   error = FALSE,
@@ -20,7 +20,8 @@ knitr::opts_chunk$set(
 ```
 
 ```{r setup, include = FALSE}
-pacman::p_load(AntiSaccade, papaja, brms, dplyr, ggplot2)
+pacman::p_load_gh("GidonFrischkorn/AntiSaccade")
+pacman::p_load(papaja, brms, dplyr, ggplot2)
 options(mc.cores = parallel::detectCores())
 
 # plot settings
@@ -80,7 +81,7 @@ linear_model <- bf(correct | trials(nTrials) ~
                      (0 + Block + Block:CTI_num | ID))
 ```
 
-For all parameters, we used moderately informative normal priors centered on zero with a standard deviation on one.
+For all parameters, we used moderately informative logistic priors centered on zero with a scale of one.
 
 ```{r Priors}
 model_priors <- prior("logistic(0,1)", class = b)
@@ -121,9 +122,11 @@ names(table_data)[which(names(table_data) == "CTI_num")] <- "CTI"
 knitr::kable(table_data, digits = 2)
 ```
 
-The summary statistics for the Proportion of correct responses in the three different blocks for all CTI duration is given in \@ref(tab:TableDesc). Figure \@ref(fig:FigDesc) displays the changes of performance across the different conditions and includes performance of each subject in each of the conditions.
+The summary statistics for the Proportion of correct responses in the three different blocks for all CTI duration is given in \@ref(tab:TableDesc). Figure @fig-descriptivesCTI displays the changes of performance across the different conditions and includes performance of each subject in each of the conditions.
 
-```{r FigDesc, echo=FALSE, fig.align='center', fig.height=4, fig.width=6, message=FALSE, warning=FALSE, fig.cap="Descriptive plots of the average performance and performance of each subject in each block across the different CTI durations"}
+```{r FigDesc, echo=FALSE}
+#| label: fig-descriptivesCTI
+#| tab-cap: "Descriptive plots of the average performance and performance of each subject in each block across the different CTI durations"
 plot_data <- data |> 
   group_by(ID, Block, CTI) |> 
   summarise(pC = sum(correct)/n(), .groups = "drop")
@@ -143,24 +146,35 @@ ggplot(data = plot_data,
   theme(panel.grid.major.x = element_blank())
 ```
 
-
 ## GLM: Accuracy
 
-```{r FitModel, echo=FALSE}
+```{r FitModel}
 fit_SuppExp4_saturated <- brms::brm(linear_model,
-                          data = agg_data,
-                          family = model_family,
-                          backend = "cmdstanr",
-                          chains = nChains,
-                          iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
-                          prior = model_priors,
-                          save_pars = save_pars(all = T),
-                          sample_prior = T,
-                          file = "modelFits_SuppExp/fit_SuppExp4_saturated",
-                          file_refit = "on_change")
+                                    data = agg_data,
+                                    family = model_family,
+                                    backend = "cmdstanr",
+                                    chains = nChains,
+                                    iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
+                                    prior = model_priors,
+                                    save_pars = save_pars(all = T),
+                                    sample_prior = T,
+                                    file = "modelFits_SuppExp/fit_SuppExp4_saturated",
+                                    file_refit = "on_change")
+
+fit_SuppExp4_saturated_priors <- brms::brm(linear_model,
+                                           data = agg_data,
+                                           family = model_family,
+                                           backend = "cmdstanr",
+                                           chains = nChains,
+                                           iter = warmup_samples + postwarmup_samples, warmup = warmup_samples,
+                                           prior = model_priors,
+                                           save_pars = save_pars(all = T),
+                                           sample_prior = "only",
+                                           file = "modelFits_SuppExp/fit_SuppExp4_saturated_priors",
+                                           file_refit = "on_change")
 ```
 
-```{r PredEffects}
+```{r PredEffects, echo = FALSE}
 #| label: fig-PredEffects
 #| fig-cap: "Posterior predictives of the average proportion correct as a function of CTI duration in the three experimental blocks."
 newdata <- expand.grid(
@@ -193,25 +207,32 @@ ggplot(data = tidy_pred_saturated,
   theme(panel.grid.major.x = element_blank())
 ```
 
-```{r echo=FALSE}
-hyp_fit <- c(Cen3_Cen4 = "BlockCentral3 = BlockCentral4",
-             Cen3_Ran = "BlockCentral3 = BlockRandom",
-             Ran_Cen4 = "BlockRandom = BlockCentral4",
-             CTI_Cen3 = "BlockCentral3:CTI_num = 0",
-             CTI_Cen4 = "BlockCentral4:CTI_num = 0",
-             CTI_Ran = "BlockRandom:CTI_num = 0",
-             CTI_C3vC4 = "BlockCentral3:CTI_num = BlockCentral4:CTI_num",
-             CTI_C3vR = "BlockCentral3:CTI_num = BlockRandom:CTI_num",
-             CTI_RvC4 = "BlockRandom:CTI_num = BlockCentral4:CTI_num")
+```{r Calc_BF, echo=FALSE}
+CTI_effects <- emmeans::emtrends(fit_SuppExp4_saturated, ~ Block, var = "CTI_num")
+Intercepts <- emmeans::emmeans(fit_SuppExp4_saturated, ~ Block, at = list(CTI_num = c(0)))
 
-hyp_results <- hypothesis(fit_SuppExp4_saturated,hyp_fit)
+CTI_effects_prior <- emmeans::emtrends(fit_SuppExp4_saturated_priors, ~ Block, var = "CTI_num")
+Intercepts_prior <- emmeans::emmeans(fit_SuppExp4_saturated_priors, ~ Block, at = list(CTI_num = c(0)))
+
+BF_Int <- bayestestR::bayesfactor_parameters(pairs(Intercepts), prior = pairs(Intercepts_prior))
+BF_CTI <- bayestestR::bayesfactor_parameters(pairs(CTI_effects), prior = pairs(CTI_effects_prior))
+
+BF_Int$BF_Int <- exp(BF_Int$log_BF)
+BF_CTI$BF_CTI <- exp(BF_CTI$log_BF)
+
+BF_Int <- BF_Int[,c(1,3)]
+BF_CTI <- BF_CTI[,c(1,3)]
+
+BF_All <- merge(BF_Int,BF_CTI)
 ```
 
-@fig-PredEffects shows the posterior predictive estimates from the Bayesian GLM for the different experimental blocks and the linear effect of CTI on the proportion correct scale. Comparisons of the posterior estimates indicated that at the shortest CTI (50ms) performance in the Central3-Saccade Block was equal in the Central4-Saccade, $BF_{01}$ = `r printnum(hyp_results$hypothesis$Evid.Ratio[1], format = "g")`. For the comparions of performance at the shortest CTI between the Random and the two Central blocks there was no conclusive evidence, $BF_{01}$ = `r printnum(abs(hyp_results$hypothesis$Evid.Ratio[2]), format = "g")`, and the Central4-Block, $BF_{01}$ = `r printnum(abs(hyp_results$hypothesis$Evid.Ratio[3]), format = "g")`. 
 
-For all three blocks there was strong evidence in favor of a positive effect of the CTI on performance, Central3: $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[4]), format = "g")`, Central4: $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[5]), format = "g")`, Random: $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[6]), format = "g")`. When comparing the effect of CTI between the blocks, we found strong evidence of the CTI effects beeing equal when compared pairwise, `r printnum(min(abs(hyp_results$hypothesis$Evid.Ratio[7:9])), format = "g")` < $BF_{01}$ < `r printnum(max(abs(hyp_results$hypothesis$Evid.Ratio[7:9])), format = "g")`.
+@fig-PredEffects shows the posterior predictive estimates from the Bayesian GLM for the different experimental blocks and the linear effect of CTI on the proportion correct scale. Comparisons of the posterior estimates (see @tbl-parameters and @tbl-BayesFactors) indicated that at the shortest CTI (50ms) performance in the Central3 Block was equal to the Central4 and Random block. There was moderate evidence for the performance in the No Saccade block being lower than in the Central3 block. Performance in the Central4 Block at the shortest CTI was better than in the Random and No Saccade Block. And performance at the shortest CTI did not differ between the Random and No Saccade Block.
 
-```{r Table_Parameters}
+For the CTI effects there was mostly evidence against them differing between blocks, except for the comparison between the No Cue and Random Cue Block, where there was inconclusive evidence.
+
+
+```{r Table_Parameters, echo=FALSE}
 #| label: tbl-parameters
 #| tab-cap: "Overview of parameter estimates (on the logit scale) for the fixed and random effects in the Bayesian GLM."
 fixFX <- fixef(fit_SuppExp4_saturated)
@@ -225,4 +246,10 @@ colnames(sdFX) <- stringr::str_replace(colnames(sdFX), "Estimate","Random Effect
 
 allFX <- cbind(fixFX, sdFX)
 knitr::kable(allFX[,c(1,3:5,7:8)], digits = 2)
+```
+
+```{r Table_BF, echo = FALSE}
+#| label: tbl-BayesFactors
+#| tbl-cap: "Bayes Factors for the pairwise comparisons of the intercepts and the CTI effects between the different experimental blocks."
+knitr::kable(BF_All, digits = 2)
 ```

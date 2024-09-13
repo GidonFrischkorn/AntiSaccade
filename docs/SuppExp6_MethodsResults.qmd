@@ -20,7 +20,8 @@ knitr::opts_chunk$set(
 ```
 
 ```{r setup, include = FALSE}
-pacman::p_load(AntiSaccade, papaja, brms, dplyr, ggplot2)
+pacman::p_load_gh("GidonFrischkorn/AntiSaccade")
+pacman::p_load(papaja, brms, dplyr, ggplot2)
 options(mc.cores = parallel::detectCores())
 
 # plot settings

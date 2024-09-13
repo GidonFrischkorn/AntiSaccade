@@ -1,7 +1,8 @@
 ---
 title: "Experiment 2: Methods & Results"
-format: docx
+format: html
 editor: visual
+embed-resources: TRUE
 editor_options: 
   chunk_output_type: console
 ---
@@ -19,7 +20,8 @@ knitr::opts_chunk$set(
 ```
 
 ```{r setup}
-pacman::p_load(AntiSaccade, papaja, brms, dplyr, ggplot2, here, lavaan, tidybayes)
+pacman::p_load_gh("GidonFrischkorn/AntiSaccade")
+pacman::p_load(papaja, brms, dplyr, ggplot2)
 options(mc.cores = parallel::detectCores())
 
 # plot settings

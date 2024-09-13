@@ -1,7 +1,8 @@
 ---
 title: "Experiment 1: Method & Results"
-format: docx
+format: html
 editor: visual
+embed-resources: TRUE
 editor_options: 
   chunk_output_type: console
 ---
@@ -19,7 +20,8 @@ knitr::opts_chunk$set(
 ```
 
 ```{r setup}
-pacman::p_load(AntiSaccade, papaja, brms, dplyr, ggplot2, here, lavaan)
+pacman::p_load_gh("GidonFrischkorn/AntiSaccade")
+pacman::p_load(papaja, brms, dplyr, ggplot2)
 options(mc.cores = parallel::detectCores())
 
 # plot settings
@@ -159,8 +161,8 @@ Formally, this resulted in the following model:
 
 $$
 \begin{align}
-\lambda_{j,k,l} &= b_{PercSpeed} + Inhib_j * b_{InhibPro} * e^{-b_{InhibReact}*CTI_k} + Binding_j + b_{Binding} * CTI_k \\
-&= + Saccade_j * b_{Saccade} + BottomUp_j * b_{BottomUp} + GoalMain_j * b_{GoalMain} * PrepTime_l; \\
+\lambda_{j,k,l} =& b_{PercSpeed} + Inhib_j * b_{InhibPro} * e^{-b_{InhibReact}*CTI_k} + Binding_j + b_{Binding} * CTI_k \\
+& + Saccade_j * b_{Saccade} + BottomUp_j * b_{BottomUp} + GoalMain_j * b_{GoalMain} * PrepTime_l; \\
 p_{j,k,l} &= \frac{1}{1 + e^{-\lambda_{j,k,l}}}
 \end{align}
 $$
