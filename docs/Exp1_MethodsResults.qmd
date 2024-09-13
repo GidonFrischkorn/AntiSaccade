@@ -801,6 +801,12 @@ df_cor[which(df_cor$name == "Saccade"),]$process <- ifelse(
 df_cor[which(df_cor$name == "Capture"),]$process <- ifelse(
   df_cor[which(df_cor$name == "Capture"),]$Block %in% bottomup_blocks, "yes", "no")
 
+df_cor$name <- factor(df_cor$name, 
+                      levels = c("PercSpeed", "Capture","Saccade",
+                                 "InhibReac", "Binding"))
+levels(df_cor$name) <- c("Perc. Speed", "Bottom-Up Gudiance","Saccade", 
+                         "Inhibition: Reactive", "Binding")
+
 plot_validity <- ggplot(data = df_cor,
                         aes(x = as.factor(CTI), y = mean, ymin = CIlow, ymax = CIhigh, color = Block, shape = process, alpha = process)) +
   geom_point(position = position_dodge(0.5), size =2) +

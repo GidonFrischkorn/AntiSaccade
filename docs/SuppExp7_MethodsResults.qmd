@@ -26,7 +26,7 @@ options(mc.cores = parallel::detectCores())
 # plot settings
 plot_dodge <- 1
 jitter_width <- 1
-point_alpha <- 0.1
+point_alpha <- 0.25
 ```
 
 # Methods
@@ -38,6 +38,18 @@ data$CTI_num <- (data$CTI - min(data$CTI))/1000
 data$CTI <- as.factor(data$CTI)
 data$RTms <- data$RTms + 150
 ```
+
+
+
+## Participants
+
+We recruited `r papaja::printnum(nSub)` participant to participate in the lab. Participants were required to be 18 to 40 years old.
+
+## Design
+
+In this study, we comapred if there were differences in the experimental effects between working on the saccade task on a laptop versus PC. We ran the Anti-, Central-, and a new Color Saccade block. In the Color Saccade Block a cue was presented in the center of the screen. This cue was coloured in one of four colors, with each color indicating that the target could appear in one of the four peripheral locations.
+
+## Data Analysis
 
 ```{r include=FALSE}
 n_full <- nrow(data)
@@ -75,6 +87,16 @@ agg_data <- data |>
   summarise(correct = sum(correct), nTrials = n(), .groups = "drop")
 ```
 
+Prior to data analysis we removed trials with reaction times shorter than 50 ms and longer than 5000ms. This resulted in discarding `r papaja::printnum(prop_filter)`% of data.
+
+We analyzed the number of correct responses with a Bayesian Generalized Linear Model assuming the number of correct responses to follow a binomial distribution. We used a logit link function, thus estimating the linear model on the logit-scale. The model was estimated using the R package `brms`.
+
+Specifically, we estimated the mean performance in each block at the shortest CTI duration as separate intercepts. We then included a linear CTI effect for each Block to estimate changes in performance as CTIs get longer. We included random effects for the intercepts and linear CTI effects in each Block without estimating the correlations between them. For all parameters, we used moderately informative logistic priors centered on zero with a scale of one. We estimated parameter with four independent MCMC chains retaining 10000 samples for each chain after 2000 warmup samples:
+
+# Results
+
+## Descriptives
+
 ```{r TableDesc, echo=FALSE, fig.align='center', out.width="80%"}
 #| label: tbl-descriptivesCTI
 #| tab-cap: "Desciptive statistiscs for the proportion correct in the different experimental conditions and each CTI condition."
@@ -91,6 +113,8 @@ names(table_data)[which(names(table_data) == "CTI_num")] <- "CTI"
 
 knitr::kable(table_data, digits = 2)
 ```
+
+The summary statistics for the Proportion of correct responses in the three different blocks for all CTI duration is given in @tbl-descriptivesCTI. @fig-descriptive displays the changes of performance across the different conditions and includes performance of each subject in each of the conditions.
 
 ```{r FigDesc, echo=FALSE, fig.align='center', fig.height=4, fig.width=6, message=FALSE, warning=FALSE, fig.cap=""}
 #| label: fig-descriptive
@@ -161,6 +185,8 @@ ggplot(data = tidy_pred_saturated,
   theme_bw() +
   theme(panel.grid.major.x = element_blank())
 ```
+
+@fig-PredEffects shows the 
 
 ```{r echo=FALSE}
 hyp_fit <- c(Ant_intFX = "deviceLaptop:BlockAnti = devicePC:BlockAnti",

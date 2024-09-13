@@ -160,9 +160,7 @@ fit_SuppExp4_saturated <- brms::brm(linear_model,
                           file_refit = "on_change")
 ```
 
-(ref:post-pred) Posterior predictives of the average proportion correct as a function of CTI duration in the three experimental blocks.
-
-```{r PredEffects, echo=FALSE, message=FALSE, warning=FALSE, fig.cap="(ref:post-pred)", fig.align='center'}
+```{r PredEffects}
 #| label: fig-PredEffects
 #| fig-cap: "Posterior predictives of the average proportion correct as a function of CTI duration in the three experimental blocks."
 newdata <- expand.grid(
@@ -209,7 +207,7 @@ hyp_fit <- c(Cen3_Cen4 = "BlockCentral3 = BlockCentral4",
 hyp_results <- hypothesis(fit_SuppExp4_saturated,hyp_fit)
 ```
 
-Figure \@ref(fig:PredEffects) shows the posterior predictive estimates from the Bayesian GLM for the different experimental blocks and the linear effect of CTI on the proportion correct scale. Comparisons of the posterior estimates indicated that at the shortest CTI (50ms) performance in the Central3-Saccade Block was equal in the Central4-Saccade, $BF_{01}$ = `r printnum(hyp_results$hypothesis$Evid.Ratio[1], format = "g")`. For the comparions of performance at the shortest CTI between the Random and the two Central blocks there was no conclusive evidence, $BF_{01}$ = `r printnum(abs(hyp_results$hypothesis$Evid.Ratio[2]), format = "g")`, and the Central4-Block, $BF_{01}$ = `r printnum(abs(hyp_results$hypothesis$Evid.Ratio[3]), format = "g")`. 
+@fig-PredEffects shows the posterior predictive estimates from the Bayesian GLM for the different experimental blocks and the linear effect of CTI on the proportion correct scale. Comparisons of the posterior estimates indicated that at the shortest CTI (50ms) performance in the Central3-Saccade Block was equal in the Central4-Saccade, $BF_{01}$ = `r printnum(hyp_results$hypothesis$Evid.Ratio[1], format = "g")`. For the comparions of performance at the shortest CTI between the Random and the two Central blocks there was no conclusive evidence, $BF_{01}$ = `r printnum(abs(hyp_results$hypothesis$Evid.Ratio[2]), format = "g")`, and the Central4-Block, $BF_{01}$ = `r printnum(abs(hyp_results$hypothesis$Evid.Ratio[3]), format = "g")`. 
 
 For all three blocks there was strong evidence in favor of a positive effect of the CTI on performance, Central3: $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[4]), format = "g")`, Central4: $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[5]), format = "g")`, Random: $BF_{10}$ = `r printnum(abs(1/hyp_results$hypothesis$Evid.Ratio[6]), format = "g")`. When comparing the effect of CTI between the blocks, we found strong evidence of the CTI effects beeing equal when compared pairwise, `r printnum(min(abs(hyp_results$hypothesis$Evid.Ratio[7:9])), format = "g")` < $BF_{01}$ < `r printnum(max(abs(hyp_results$hypothesis$Evid.Ratio[7:9])), format = "g")`.
 

@@ -1002,6 +1002,16 @@ agg_data_validity <- data %>%
     .groups = "drop"
   )
 
+relEst_validity <- data |> 
+  group_by(ID, Block, CTI_num) |>
+  mutate(OddEven = ifelse(1:n() %% 2 == 0, "even","odd")) |> 
+  ungroup() |> group_by(ID, Block, CTI_num, OddEven) |>
+  summarise(propCorr = sum(correct)/n(), .groups = "drop") |> 
+  tidyr::pivot_wider(names_from = OddEven, values_from = propCorr) |>
+  group_by(Block, CTI_num) |> 
+  summarise(relEst = cor(odd, even, use = "complete.obs"),
+            relEst_corr = (2*relEst)/(1+relEst))
+
 randFX_draws <- fit_E2_th_final %>% 
   tidybayes::gather_draws(r_ID__PercSpeed[ID,],
                           r_ID__capture[ID,],
@@ -1026,6 +1036,8 @@ df_validity = expand.grid(
 ) |> left_join(randFX_draws, by = c("ID",".chain",".draw",".iteration")) |> 
   left_join(agg_data_validity, by = c("ID","Block","CTI_num"))
 
+
+
 df_cor <- df_validity %>% 
   group_by(Block, CTI_num, .draw) %>% 
   summarise(
@@ -1037,6 +1049,8 @@ df_cor <- df_validity %>%
     Saccade = cor(pC, saccReq, use = "complete.obs"),
     .groups = "drop") %>% 
   tidyr::pivot_longer(cols = c(PercSpeed, InhibReac, Binding, arbBind, Capture, Saccade)) %>% 
+  left_join(relEst_validity) |> 
+  # mutate(value = value/sqrt(relEst_corr)) |> 
   group_by(Block, CTI_num, name) %>% 
   summarise(
     mean = mean(value),
@@ -1057,8 +1071,11 @@ df_cor[which(df_cor$name == "Capture"),]$process <- ifelse(
 df_cor[which(df_cor$name == "Saccade"),]$process <- ifelse(
   df_cor[which(df_cor$name == "Saccade"),]$Block %in% saccade_blocks, "yes", "no")
 
-df_cor$name <- factor(df_cor$name)
-levels(df_cor$name) <- c("Binding: Arbitrary", "Binding", "Bottom-Up Capture", "Inhibition: Reactive", "Perc. Speed", "Saccade")
+df_cor$name <- factor(df_cor$name, 
+                      levels = c("PercSpeed", "Capture","Saccade",
+                                 "InhibReac", "Binding", "arbBind"))
+levels(df_cor$name) <- c("Perc. Speed", "Bottom-Up Gudiance","Saccade", 
+                         "Inhibition: Reactive", "Binding", "ΔB")
 
 plot_validity <- ggplot(data = df_cor,
                         aes(x = as.factor(CTI_num*1000), y = mean, ymin = CIlow, ymax = CIhigh, color = Block, shape = process, alpha = process)) +
@@ -1082,6 +1099,15 @@ knitr::include_graphics("figures_E2/Validity_E2.jpg")
 ```{r}
 #| label: fig-covcorr
 #| fig-cap: "Correlations of average performance in the different experimental blocks of the manual anti-saccade task with working memory capacity (WMC) and processing speed (PS). The points indicate the correlation coefficient and error bars the 95% confindence interval."
+relEst_SaccTask <- data |> 
+  mutate(OddEven = ifelse(trial %% 2 == 0, "even","odd")) |> 
+  group_by(ID, Block, OddEven) |>
+  summarise(propCorr = sum(correct)/n(), .groups = "drop") |> 
+  tidyr::pivot_wider(names_from = OddEven, values_from = propCorr) |>
+  group_by(Block) |> 
+  summarise(relEst = cor(odd, even, use = "complete.obs"),
+            relEst_corr = (2*relEst)/(1+relEst))
+
 df_corr_descriptive <- data %>%
   dplyr::group_by(ID, Block) %>%
   dplyr::summarise(
@@ -1096,31 +1122,48 @@ df_corr_descriptive <- data %>%
     n_WMC = n() - sum(is.na(WMC_g)),
     n_PS = n() - sum(is.na(v))
   ) |> 
+  left_join(relEst_SaccTask) |> 
   mutate(
-    r_WMC_upper = tanh(atanh(r_WMC_mean) + qnorm(.975) * (1/sqrt(n_WMC))),
-    r_WMC_lower = tanh(atanh(r_WMC_mean) + qnorm(.025) * (1/sqrt(n_WMC))),
-    r_PS_upper = tanh(atanh(r_PS_mean) + qnorm(.975) * (1/sqrt(n_PS))),
-    r_PS_lower = tanh(atanh(r_PS_mean) + qnorm(.025) * (1/sqrt(n_PS)))
+    r_WMC_relCor = r_WMC_mean/sqrt(relEst_corr),
+    r_PS_relCor = r_WMC_mean/sqrt(relEst_corr),
+    r_WMC_mean_upper = tanh(atanh(r_WMC_mean) + qnorm(.975) * (1/sqrt(n_WMC))),
+    r_WMC_mean_lower = tanh(atanh(r_WMC_mean) + qnorm(.025) * (1/sqrt(n_WMC))),
+    r_PS_mean_upper = tanh(atanh(r_PS_mean) + qnorm(.975) * (1/sqrt(n_PS))),
+    r_PS_mean_lower = tanh(atanh(r_PS_mean) + qnorm(.025) * (1/sqrt(n_PS))),
+    r_WMC_relCor_upper = tanh(atanh(r_WMC_relCor) + qnorm(.975) * (1/sqrt(n_WMC))),
+    r_WMC_relCor_lower = tanh(atanh(r_WMC_relCor) + qnorm(.025) * (1/sqrt(n_WMC))),
+    r_PS_relCor_upper = tanh(atanh(r_PS_relCor) + qnorm(.975) * (1/sqrt(n_PS))),
+    r_PS_relCor_lower = tanh(atanh(r_PS_relCor) + qnorm(.025) * (1/sqrt(n_PS)))
   ) |> 
-  tidyr::pivot_longer(cols = c(r_WMC_mean, r_PS_mean, r_WMC_upper, r_WMC_lower, r_PS_upper, r_PS_lower), names_to = "Covariate", values_to = "Correlation") |> 
+  tidyr::pivot_longer(cols = c(r_WMC_mean, r_PS_mean, r_WMC_mean_upper, r_WMC_mean_lower, r_PS_mean_upper, r_PS_mean_lower,
+                               r_WMC_relCor, r_PS_relCor, r_WMC_relCor_upper, r_WMC_relCor_lower, r_PS_relCor_upper, r_PS_relCor_lower), 
+                      names_to = "Covariate", values_to = "Correlation") |> 
   mutate(pred = stringr::str_split_i(Covariate, "_", 2),
-         stat = stringr::str_split_i(Covariate, "_", 3)) |> 
-  select(Block, pred, stat, Correlation) |>
-  tidyr::pivot_wider(names_from = c(stat), values_from = Correlation)
+         type = stringr::str_split_i(Covariate, "_", 3),
+         stat = stringr::str_split_i(Covariate, "_", 4),
+         stat = case_when(is.na(stat) ~ "point",
+                          TRUE ~ stat)) |> 
+  select(Block, pred, type, stat, Correlation) |>
+  tidyr::pivot_wider(names_from = c(stat), values_from = Correlation) |>
+  left_join(Block2Conds)
 df_corr_descriptive$pred <- as.factor(df_corr_descriptive$pred)
-levels(df_corr_descriptive$pred)
 
-plot_cor_descriptive <- ggplot(df_corr_descriptive,
-                               aes(y = mean, x = pred, ymin = lower, ymax = upper, color = Block)) +
+
+df_corr_descriptive$binding <- as.factor(df_corr_descriptive$binding)
+levels(df_corr_descriptive$binding) <- c("no", "yes")
+
+plot_cor_descriptive <- ggplot(df_corr_descriptive |> filter(type == "relCor"),
+                               aes(y = point, x = as.factor(binding), ymin = lower, ymax = upper, color = Block)) +
+  facet_wrap(~ pred) +
   geom_point(position = position_dodge(0.25), size = 2) +
   geom_errorbar(width = 0, position = position_dodge(0.25)) +
-  labs(y = "Correlation", x = "Covariate") +
+  labs(y = "Correlation", x = "Binding") +
   geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
   theme_bw() +
   theme(panel.grid.major.x = element_blank())
 
-ggsave(filename = "figures_E2/DescCorrelation_E1.jpg",plot_cor_descriptive, dpi = 300, width = 4, height = 4)
-knitr::include_graphics("figures_E2/DescCorrelation_E1.jpg")
+ggsave(filename = "figures_E2/DescCorrelation_E2.jpg",plot_cor_descriptive, dpi = 300, width = 6, height = 4)
+knitr::include_graphics("figures_E2/DescCorrelation_E2.jpg")
 ```
 
 In @fig-covcorr the correlations of the average performance in the different experimental blocks of the manual anti-saccade task with the two covariates, working memory capacity (WMC) and processing speed (PS) are shown. As indicated by the 95% confidence intervals, the correlations with both covariates are all significantly different from zero for all experimental. Although this replicates previous studies that found correlations between performance in the manual anti-saccade task, the results also indicate that most likely processes shared between all tasks are underlying the relationship between performance in the anti-saccade task with the covariates. Otherwise, only performance in the anti-saccade block should correlate with the covariate.
