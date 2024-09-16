@@ -21,7 +21,7 @@ knitr::opts_chunk$set(
 
 ```{r setup}
 pacman::p_load_gh("GidonFrischkorn/AntiSaccade")
-pacman::p_load(papaja, brms, dplyr, ggplot2)
+pacman::p_load(papaja, here, lavaan, brms, dplyr, ggplot2)
 options(mc.cores = parallel::detectCores())
 
 # plot settings
@@ -100,7 +100,7 @@ We recruited `r papaja::printnum(nSub_total)` participants via Prolific, `r papa
 
 All tasks were again programmed in lab.js (Henninger et al., 2020) and run via JATOS. The tasks were run locally on the participants machines, but we required that the a laptop or desktop computer was used.[^1] Participation using a tablet or smartphone was not allowed. All tasks were run in a single session that lasted approximately 90 to 100 minutes. In between tasks participants were allowed to take breaks. For all participants the session started with the manual saccade task, followed by switching between one of the working memory task and processing task until all tasks were completed.
 
-[^1]: In the supplementary experiment 7 (S7), we investigated if experimental manipulations in the manual anti-saccade task are comparable when performing it on a laptop and desktop computer. The results indicated that there were no differences in the experimental effects. Our goal with this study was to investigate to what extend differences in the devices used could impact the experimental effects as well as individual differences in the manual anti-saccade task.
+[^1]: In the supplementary experiment 6 (S6), we investigated if experimental manipulations in the manual anti-saccade task are comparable when performing it on a laptop and desktop computer. The results indicated that there were no differences in the experimental effects. Our goal with this study was to investigate to what extend differences in the devices used could impact the experimental effects as well as individual differences in the manual anti-saccade task.
 
 ### Saccade Task
 
@@ -123,7 +123,7 @@ We again varied the Cue-Traget Innterval, but only in two levels[^2]: 50 and 400
 
 [^2]: We dropped one CTI condition to reduce testing time.
 
-We also noticed, that in the first experiment performance was better (Average PC around 80% in Anti-Saccade and 95% in Pro-Saccade trials at the shortest CTI) than in previous studies using the manual Anti-Saccade task (Average PC around 50% in Anti-Saccade and 95% in Pro-Saccade trials). Therefore, we adapted the font size of the stimuli to more closely match the average performance in previous studies. For this we ran two additional supplementary experiments S5 and S6 that are reported in the online supplementary material. Finally, we also evaluated if differences in Screen sizes might contribute to individual differences in the experimental effects and compared if completing the task on a laptop with a small screen compared to a lab computer with a large screen changed the size of effects in the different experimental blocks. This was not the case as can be seen from the results of experiment S7 reported in the supplementary material.
+We also noticed, that in the first experiment performance was better (Average PC around 80% in Anti-Saccade and 95% in Pro-Saccade trials at the shortest CTI) than in previous studies using the manual Anti-Saccade task (Average PC around 50% in Anti-Saccade and 95% in Pro-Saccade trials). Therefore, we adapted the font size of the stimuli to more closely match the average performance in previous studies. For this we ran two additional supplementary experiments S4 and S5 that are reported in the online supplementary material. Finally, we also evaluated if differences in Screen sizes might contribute to individual differences in the experimental effects and compared if completing the task on a laptop with a small screen compared to a lab computer with a large screen changed the size of effects in the different experimental blocks. This was not the case as can be seen from the results of experiment S7 reported in the supplementary material.
 
 ### Working Memory Tasks
 
@@ -131,7 +131,7 @@ We also noticed, that in the first experiment performance was better (Average PC
 data_WMC <- Exp2_WMC_data
 
 # extract PCA scores for WMC
-data_CS_proc <- Exp9_WorkingMemory %>% 
+data_CS_proc <- Exp2_WMC_data %>% 
   filter(task == "CS processing")
 
 nSub_CS_total <- length(unique(data_CS_proc$ID))
@@ -221,7 +221,7 @@ We discarded subjects that did not perform the processing task or were below 70%
 # load data of covariates
 data_PS <- Exp2_PS_data
 
-data_HT <- Exp9_ProcSpeed %>% 
+data_HT <- Exp2_PS_data %>% 
   filter(task == "HT")
 data_HT_outlier <- data_HT %>% 
   mutate(outlier_RT = case_when(RTms < 50 ~ "fast",
@@ -245,7 +245,7 @@ ID_HT_outlier <- unique(data_HT_outlier$ID)
 data_HT_clean <- data_HT %>% 
   filter(!ID %in% ID_HT_outlier)
 
-data_CJ <- Exp9_ProcSpeed %>% 
+data_CJ <- Exp2_PS_data %>% 
   filter(task == "CJ")
 
 data_CJ_outlier <- data_CJ %>% 
@@ -270,7 +270,7 @@ ID_CJ_outlier <- unique(data_CJ_outlier$ID)
 data_CJ_clean <- data_CJ %>% 
   filter(!ID %in% ID_CJ_outlier)
 
-data_NJ <- Exp9_ProcSpeed %>% 
+data_NJ <- Exp2_PS_data %>% 
   filter(task == "NJ")
 
 data_NJ_outlier <- data_NJ %>% 

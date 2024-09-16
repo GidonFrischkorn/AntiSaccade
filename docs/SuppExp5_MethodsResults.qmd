@@ -34,9 +34,8 @@ point_alpha <- 0.1
 
 ```{r load_data, include=FALSE}
 data <- SuppExp5_data
-
 nSub <- length(unique(data$ID))
-data$CTI_num <- (data$SOA - 300)/1000
+data$CTI_num <- (data$CTI - min(data$CTI))/1000
 data$CTI <- as.factor(data$CTI)
 data$RTms <- data$RTms + 150
 ```
@@ -58,7 +57,7 @@ linear_model <- bf(correct | trials(nTrials) ~
                      # fixed effects
                      0 + Block + Block:CTI_num + 
                      # random effects
-                     (0 + Block + Block:CTI_num |document| ID))
+                     (0 + Block + Block:CTI_num || ID))
 ```
 
 ```{r Priors}
@@ -117,7 +116,7 @@ ggplot(data = plot_data,
 ```
 
 ```{r FitModel, echo=FALSE}
-fit_SuppExp5_saturated <- brms::brm(linear_model,
+fit_SuppExp6_saturated <- brms::brm(linear_model,
                           data = agg_data,
                           family = model_family,
                           backend = "cmdstanr",
@@ -134,17 +133,27 @@ fit_SuppExp5_saturated <- brms::brm(linear_model,
 #| label: fig-PredEffects
 #| fig-cap: "Posterior predictives of the average proportion correct as a function of CTI duration in the three experimental blocks."
 newdata <- expand.grid(
-  ID = unique(fit_SuppExp5_saturated$data$ID),
+  ID = unique(fit_SuppExp6_saturated$data$ID),
   nTrials = 1,
-  Block = unique(fit_SuppExp5_saturated$data$Block),
-  CTI_num = unique(fit_SuppExp5_saturated$data$CTI_num)
+  Block = unique(fit_SuppExp6_saturated$data$Block),
+  CTI_num = unique(fit_SuppExp6_saturated$data$CTI_num)
 )
 
-tidy_pred_saturated <- fit_SuppExp5_saturated %>% 
+tidy_pred_saturated <- fit_SuppExp6_saturated %>% 
   tidybayes::epred_draws(newdata = newdata, ndraws = 1000) %>% 
   group_by(ID, CTI_num, Block) %>% 
   summarise(predValue = mean(.epred)) %>% 
   mutate(CTI_num = (CTI_num + 0.05)*1000)
+
+cond_plot <- plot(conditional_effects(fit_SuppExp6_saturated, effects = "CTI_num:Block", select_points = 0.1))[[1]]
+cond_plot + 
+  geom_hline(yintercept = 1/3, color = "darkred", linetype = "dashed") +
+  geom_hline(yintercept = 1/2, color = "darkgreen", linetype = "dashed") +
+  labs(x = "Cue-Target Interval (in ms)",
+       y = "Proportion Correct",
+       color = "Block", fill = "Block") +
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank())
 
 ggplot(data = tidy_pred_saturated,
        aes(y = predValue, x = as.factor(CTI_num), 
@@ -156,6 +165,7 @@ ggplot(data = tidy_pred_saturated,
                geom = "point", fun = mean, position = position_dodge(plot_dodge), 
                color = "black", shape = "cross", size = 3) +
   geom_hline(yintercept = 1/3, color = "darkred", linetype = "dashed") +
+  geom_hline(yintercept = 1/2, color = "darkgreen", linetype = "dashed") +
   labs(x = "Cue-Target Interval (in ms)",
        y = "Proportion Correct",
        color = "Block", fill = "Block") +
@@ -164,15 +174,17 @@ ggplot(data = tidy_pred_saturated,
 ```
 
 ```{r echo=FALSE}
-hyp_fit <- c(Pro_Ant = "BlockPro = BlockAnti",
-             Pro_Ran = "BlockPro = BlockRandom",
-             Ran_Ant = "BlockRandom = BlockAnti",
+hyp_fit <- c(Anti_Int = "BlockAnti = 0",
+             Rand_Int = "BlockRandom = 0",
+             Col_Int = "BlockColour = 0",
+             Cen_Int = "BlockCentral = 0",
              CTI_Pro = "BlockPro:CTI_num = 0",
              CTI_Ant = "BlockAnti:CTI_num = 0",
              CTI_Ran = "BlockRandom:CTI_num = 0",
-             CTI_P2A = "BlockPro:CTI_num = BlockAnti:CTI_num",
-             CTI_P2R = "BlockPro:CTI_num = BlockRandom:CTI_num",
-             CTI_R2A = "BlockRandom:CTI_num = BlockAnti:CTI_num")
+             CTI_Col = "BlockColour:CTI_num = 0",
+             CTI_Rnd = "BlockRandom:CTI_num = 0",
+             CTI_cent = "BlockCentral:CTI_num = 0",
+             CTI_no = "BlockNo:CTI_num = 0")
 
-hyp_results <- hypothesis(fit_SuppExp5_saturated,hyp_fit)
+hyp_results <- hypothesis(fit_SuppExp6_saturated,hyp_fit)
 ```

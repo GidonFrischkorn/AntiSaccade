@@ -3,11 +3,11 @@
 \docType{data}
 \name{SuppExp5_data}
 \alias{SuppExp5_data}
-\title{Raw Data of the fifth supplementary experiment in the Saccade Experiment Series}
+\title{Raw Data of the sixth supplementary experiment in the Saccade Experiment Series}
 \format{
 \subsection{\code{SuppExp5_data}}{
 
-A data frame with  rows and 14 columns:
+A data frame with 19440 rows and 14 columns:
 \describe{
 \item{Exp}{Label for the Experiment in the whole experiment series}
 \item{ID}{Unique integer code for each subject who participated in the experiment}
@@ -34,6 +34,6 @@ A data frame with  rows and 14 columns:
 SuppExp5_data
 }
 \description{
-Raw Data of the fifth supplementary experiment in the Saccade Experiment Series
+Raw Data of the sixth supplementary experiment in the Saccade Experiment Series
 }
 \keyword{datasets}

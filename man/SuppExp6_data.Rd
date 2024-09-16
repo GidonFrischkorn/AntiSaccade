@@ -3,16 +3,17 @@
 \docType{data}
 \name{SuppExp6_data}
 \alias{SuppExp6_data}
-\title{Raw Data of the sixth supplementary experiment in the Saccade Experiment Series}
+\title{Raw Data of the seventh supplementary experiment in the Saccade Experiment Series}
 \format{
 \subsection{\code{SuppExp6_data}}{
 
-A data frame with 19440 rows and 14 columns:
+A data frame with 21602 rows and 15 columns:
 \describe{
 \item{Exp}{Label for the Experiment in the whole experiment series}
 \item{ID}{Unique integer code for each subject who participated in the experiment}
 \item{Block}{The experimental block a trial was part of.}
 \item{trial}{The trial number of the current trial}
+\item{device}{The device that was used for testing}
 \item{cueLoc}{The cue location coded as a numeric value from 1 to 4.
 1 = "top", 2 = "right", 3 = "bottom", 4 = "left"}
 \item{stimLoc}{The stimulus location coded as a numeric value from 1 to 4.
@@ -34,6 +35,6 @@ A data frame with 19440 rows and 14 columns:
 SuppExp6_data
 }
 \description{
-Raw Data of the sixth supplementary experiment in the Saccade Experiment Series
+Raw Data of the seventh supplementary experiment in the Saccade Experiment Series
 }
 \keyword{datasets}

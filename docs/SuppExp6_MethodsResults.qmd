@@ -27,7 +27,7 @@ options(mc.cores = parallel::detectCores())
 # plot settings
 plot_dodge <- 1
 jitter_width <- 1
-point_alpha <- 0.1
+point_alpha <- 0.25
 ```
 
 # Methods
@@ -39,6 +39,16 @@ data$CTI_num <- (data$CTI - min(data$CTI))/1000
 data$CTI <- as.factor(data$CTI)
 data$RTms <- data$RTms + 150
 ```
+
+## Participants
+
+We recruited `r papaja::printnum(nSub)` participant to participate in the lab. Participants were required to be 18 to 40 years old.
+
+## Design
+
+In this study, we comapred if there were differences in the experimental effects between working on the saccade task on a laptop versus PC. We ran the Anti-, Central-, and a new Color Saccade block. In the Color Saccade Block a cue was presented in the center of the screen. This cue was coloured in one of four colors, with each color indicating that the target could appear in one of the four peripheral locations.
+
+## Data Analysis
 
 ```{r include=FALSE}
 n_full <- nrow(data)
@@ -55,9 +65,9 @@ model_family <- brmsfamily("binomial", link = "logit")
 ```{r LinearModel}
 linear_model <- bf(correct | trials(nTrials) ~ 
                      # fixed effects
-                     0 + Block + Block:CTI_num + 
+                     0 + device:Block + device:Block:CTI_num + 
                      # random effects
-                     (0 + Block + Block:CTI_num || ID))
+                     (0 + device:Block + device:Block:CTI_num || ID))
 ```
 
 ```{r Priors}
@@ -72,15 +82,25 @@ postwarmup_samples <- 10000
 
 ```{r Agg_data, include=FALSE}
 agg_data <- data |> 
-  group_by(ID, Block, CTI_num) |> 
+  group_by(ID, device, Block, CTI_num) |> 
   summarise(correct = sum(correct), nTrials = n(), .groups = "drop")
 ```
+
+Prior to data analysis we removed trials with reaction times shorter than 50 ms and longer than 5000ms. This resulted in discarding `r papaja::printnum(prop_filter)`% of data.
+
+We analyzed the number of correct responses with a Bayesian Generalized Linear Model assuming the number of correct responses to follow a binomial distribution. We used a logit link function, thus estimating the linear model on the logit-scale. The model was estimated using the R package `brms`.
+
+Specifically, we estimated the mean performance in each block at the shortest CTI duration as separate intercepts. We then included a linear CTI effect for each Block to estimate changes in performance as CTIs get longer. We included random effects for the intercepts and linear CTI effects in each Block without estimating the correlations between them. For all parameters, we used moderately informative logistic priors centered on zero with a scale of one. We estimated parameter with four independent MCMC chains retaining 10000 samples for each chain after 2000 warmup samples:
+
+# Results
+
+## Descriptives
 
 ```{r TableDesc, echo=FALSE, fig.align='center', out.width="80%"}
 #| label: tbl-descriptivesCTI
 #| tab-cap: "Desciptive statistiscs for the proportion correct in the different experimental conditions and each CTI condition."
 table_data <- agg_data %>% 
-  group_by(Block, CTI_num) %>% 
+  group_by(device, Block, CTI_num) %>% 
   summarise(Mean = mean(correct/nTrials),
             SD = sd(correct/nTrials),
             Min = min(correct/nTrials),
@@ -93,22 +113,24 @@ names(table_data)[which(names(table_data) == "CTI_num")] <- "CTI"
 knitr::kable(table_data, digits = 2)
 ```
 
+The summary statistics for the Proportion of correct responses in the three different blocks for all CTI duration is given in @tbl-descriptivesCTI. @fig-descriptive displays the changes of performance across the different conditions and includes performance of each subject in each of the conditions.
+
 ```{r FigDesc, echo=FALSE, fig.align='center', fig.height=4, fig.width=6, message=FALSE, warning=FALSE, fig.cap=""}
 #| label: fig-descriptive
 #| fig-cap: "Average performance in the three experimental conditions for each level of CTI duration."
 plot_data <- data |> 
-  group_by(ID, Block, CTI) |> 
+  group_by(ID, device, Block, CTI) |> 
   summarise(pC = sum(correct)/n(), .groups = "drop")
 
 ggplot(data = plot_data,
-       aes(x = CTI, y = pC, color = Block, group = Block)) +
+       aes(x = CTI, y = pC, color = Block, shape = device, group = interaction(Block, device))) +
   stat_summary(position = position_dodge(plot_dodge)) +
   stat_summary(geom = "line", fun = mean, position = position_dodge(plot_dodge)) +
   geom_jitter(alpha = point_alpha, position = position_jitterdodge(jitter.width = jitter_width, dodge.width = plot_dodge)) +
   labs(x = "Cue-Target Interval",
        y = "Proportion Correct",
        color = "Block", fill = "Block",
-       shape = "Pos Cue = Target",
+       shape = "Hardware",
        title = "Descriptive Plot") +
   coord_cartesian(ylim = c(0,1)) +
   theme_bw() +
@@ -116,7 +138,7 @@ ggplot(data = plot_data,
 ```
 
 ```{r FitModel, echo=FALSE}
-fit_SuppExp6_saturated <- brms::brm(linear_model,
+fit_SuppExp7_saturated <- brms::brm(linear_model,
                           data = agg_data,
                           family = model_family,
                           backend = "cmdstanr",
@@ -133,31 +155,22 @@ fit_SuppExp6_saturated <- brms::brm(linear_model,
 #| label: fig-PredEffects
 #| fig-cap: "Posterior predictives of the average proportion correct as a function of CTI duration in the three experimental blocks."
 newdata <- expand.grid(
-  ID = unique(fit_SuppExp6_saturated$data$ID),
+  ID = unique(fit_SuppExp7_saturated$data$ID),
   nTrials = 1,
-  Block = unique(fit_SuppExp6_saturated$data$Block),
-  CTI_num = unique(fit_SuppExp6_saturated$data$CTI_num)
+  device = unique(fit_SuppExp7_saturated$data$device),
+  Block = unique(fit_SuppExp7_saturated$data$Block),
+  CTI_num = unique(fit_SuppExp7_saturated$data$CTI_num)
 )
 
-tidy_pred_saturated <- fit_SuppExp6_saturated %>% 
+tidy_pred_saturated <- fit_SuppExp7_saturated %>% 
   tidybayes::epred_draws(newdata = newdata, ndraws = 1000) %>% 
-  group_by(ID, CTI_num, Block) %>% 
+  group_by(ID, device, CTI_num, Block) %>% 
   summarise(predValue = mean(.epred)) %>% 
   mutate(CTI_num = (CTI_num + 0.05)*1000)
 
-cond_plot <- plot(conditional_effects(fit_SuppExp6_saturated, effects = "CTI_num:Block", select_points = 0.1))[[1]]
-cond_plot + 
-  geom_hline(yintercept = 1/3, color = "darkred", linetype = "dashed") +
-  geom_hline(yintercept = 1/2, color = "darkgreen", linetype = "dashed") +
-  labs(x = "Cue-Target Interval (in ms)",
-       y = "Proportion Correct",
-       color = "Block", fill = "Block") +
-  theme_bw() +
-  theme(panel.grid.major.x = element_blank())
-
 ggplot(data = tidy_pred_saturated,
-       aes(y = predValue, x = as.factor(CTI_num), 
-           color = as.factor(Block), group = as.factor(Block))) +
+       aes(x = as.factor(CTI_num), y = predValue, color = Block, shape = device, group = interaction(Block, device))) +
+  #facet_wrap(~device) +
   geom_jitter(alpha = point_alpha, position = position_jitterdodge(jitter.width = jitter_width, dodge.width = plot_dodge)) +
   stat_summary(position = position_dodge(plot_dodge)) +
   stat_summary(geom = "line", fun = mean, position = position_dodge(plot_dodge)) +
@@ -165,7 +178,6 @@ ggplot(data = tidy_pred_saturated,
                geom = "point", fun = mean, position = position_dodge(plot_dodge), 
                color = "black", shape = "cross", size = 3) +
   geom_hline(yintercept = 1/3, color = "darkred", linetype = "dashed") +
-  geom_hline(yintercept = 1/2, color = "darkgreen", linetype = "dashed") +
   labs(x = "Cue-Target Interval (in ms)",
        y = "Proportion Correct",
        color = "Block", fill = "Block") +
@@ -173,19 +185,16 @@ ggplot(data = tidy_pred_saturated,
   theme(panel.grid.major.x = element_blank())
 ```
 
+@fig-PredEffects shows the
+
 ```{r echo=FALSE}
-hyp_fit <- c(Anti_Int = "BlockAnti = 0",
-             Rand_Int = "BlockRandom = 0",
-             Col_Int = "BlockColour = 0",
-             Cen_Int = "BlockCentral = 0",
-             CTI_Pro = "BlockPro:CTI_num = 0",
-             CTI_Ant = "BlockAnti:CTI_num = 0",
-             CTI_Ran = "BlockRandom:CTI_num = 0",
-             CTI_Col = "BlockColour:CTI_num = 0",
-             CTI_Rnd = "BlockRandom:CTI_num = 0",
-             CTI_cent = "BlockCentral:CTI_num = 0",
-             CTI_no = "BlockNo:CTI_num = 0")
+hyp_fit <- c(Ant_intFX = "deviceLaptop:BlockAnti = devicePC:BlockAnti",
+             Cen_intFX = "deviceLaptop:BlockCentral = devicePC:BlockCentral",
+             Col_intFX = "deviceLaptop:BlockColour = devicePC:BlockColour",
+             Ant_ctiFX = "deviceLaptop:BlockAnti:CTI_num = devicePC:BlockAnti:CTI_num",
+             Cen_ctiFX = "deviceLaptop:BlockCentral:CTI_num = devicePC:BlockCentral:CTI_num",
+             Col_ctiFX = "deviceLaptop:BlockColour:CTI_num = devicePC:BlockColour:CTI_num")
 
-hyp_results <- hypothesis(fit_SuppExp6_saturated,hyp_fit)
+hyp_results <- hypothesis(fit_SuppExp7_saturated,hyp_fit)
+knitr::kable(hyp_results$hypothesis, digits = 2)
 ```
-
