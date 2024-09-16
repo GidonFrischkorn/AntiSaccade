@@ -1127,7 +1127,7 @@ df_corr_descriptive <- data %>%
   left_join(relEst_SaccTask) |> 
   mutate(
     r_WMC_relCor = r_WMC_mean/sqrt(relEst_corr),
-    r_PS_relCor = r_WMC_mean/sqrt(relEst_corr),
+    r_PS_relCor = r_PS_mean/sqrt(relEst_corr),
     r_WMC_mean_upper = tanh(atanh(r_WMC_mean) + qnorm(.975) * (1/sqrt(n_WMC))),
     r_WMC_mean_lower = tanh(atanh(r_WMC_mean) + qnorm(.025) * (1/sqrt(n_WMC))),
     r_PS_mean_upper = tanh(atanh(r_PS_mean) + qnorm(.975) * (1/sqrt(n_PS))),
