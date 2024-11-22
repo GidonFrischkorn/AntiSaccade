@@ -4,7 +4,9 @@
 .Rprofile
 .httr-oauth
 .DS_Store
+.history/
 local/
+JATOS_DATA_690/
 inst/doc
 
 # file types not to be included
