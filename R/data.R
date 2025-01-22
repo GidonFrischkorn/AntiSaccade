@@ -242,3 +242,21 @@
 #'   \item{RTms}{Reaction Time of the response in milliseconds}
 #' }
 "Exp2_WMC_data"
+
+#' Behavioral Data from Hood et al. (2022)
+#'
+#' @format ## `Hood_2022_behavioral`
+#' A data frame with 47160 rows and 13 columns:
+#' \describe{
+#'   \item{sub}{The subject ID}
+#'   \item{task}{Factor coding the task, either "pro" for the pro-saccade task, or "anti" for the anti-saccade task}
+#'   \item{delay}{The delay between onset of the fixation cross and the saccade cue.}
+#'   \item{n_corr}{The number of correctly identified letters.}
+#'   \item{n_trials}{The total number of trials in each task}
+#'   \item{ospan}{OSPAN score, i.e. the sum of sum of all perfectly recalled sets.}
+#'   \item{math_err}{Number of errors in the math processing task of the OSPAN task.}
+#'   \item{total}{total number of letters recalled in the correct position}
+#'   \item{z_ospan}{z-standardized OSPAN score.}
+#'   \item{z_total}{z-standardized total score.}
+#' }
+"Hood_2022_behavioral"
