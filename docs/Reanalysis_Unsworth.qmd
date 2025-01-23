@@ -1,0 +1,147 @@
+---
+title: "Reanalysis: Unsworth et al. (2023)"
+author: "Gidon Frischkorn"
+format: html
+embed-resources: TRUE
+---
+
+```{r SetUp}
+#| message: false
+#| warning: false
+library(here)
+library(tidyverse)
+library(lm.beta)
+library(AntiSaccade)
+library(lmerTest)
+library(brms)
+```
+
+
+## Reproduction of Results from Unsworth et al. (2023)
+
+Hood et al. (2022) investigated if the working memory capacity is more strongly related to performance in the anti- then in the pro-saccade task. For this, they first included performance in the automated OSPAN as a predictor of performance in the anti- and pro-saccade tasks. The below analysis do not exactly reproduce the results but closely math them (see below for details).
+
+```{r Reproduction_Unsworth_Results}
+Unsworth_2023_E2_binomial %>% 
+  summarise(cor_wmc = cor(zWMC, pc),
+            .by = Task)
+
+Unsworth_2023_E2_wide <- Unsworth_2023_E2_binomial %>% 
+  select(-n_trials, -n_corr) %>% 
+  pivot_wider(values_from = pc,
+              names_from = Task)
+
+lm_Anti <- lm(Antisaccade ~ Prosaccade + zWMC, data = Unsworth_2023_E2_wide)
+summary(lm_Anti)
+lm.beta(lm_Anti)
+
+lm_Pro <- lm(Prosaccade ~ Antisaccade + zWMC, data = Unsworth_2023_E2_wide)
+summary(lm_Pro)
+lm.beta(lm_Pro)
+```
+
+## Reanalysis using Bayesian GLM
+
+From our perspective the more appropriate way to analyze this data is using a Generalized liner model assuming a binomial distribution of the data. We will use a Bayesian approach to estimate the model. Usually these models are estimated using a logistic link function to ensure that probability estimates are in the range between 0 and 1.
+
+```{r Binomial_GLM}
+#| message: false
+#| warning: false
+unsworth_formula <- bf(n_corr | trials(n_trials) ~  1 + Task * zWMC + (1 + Task | Sub),
+                       family = binomial)
+
+# set appropriate constrasts for the task variable
+contrasts(Unsworth_2023_E2_binomial$Task) <- contr.treatment(2, base = 2)
+
+# set priors
+unsworth_prior <- prior(logistic(0,1), class = Intercept) +
+  prior(logistic(0, 0.5), class = b)
+
+# fit model including an intercept, main effects of task and ospan, and their interaction 
+unsworth_fit <- brm(
+  formula = unsworth_formula,
+  data = Unsworth_2023_E2_binomial,
+  family = binomial,
+  prior = unsworth_prior,
+  sample_prior = TRUE,
+  iter = 20000,
+  warmup = 1000,
+  chains = 4,
+  cores = 4,
+  file = here("output","fit_unsworth"),
+  file_refit = "on_change",
+  control = list(adapt_delta = 0.99),
+  backend = "cmdstanr"
+)
+
+# print summary
+summary(unsworth_fit)
+```
+
+An alternative specification of this model is to directly asses the performance in the pro- and anti-saccade task and seperately predict the performance by the OSPAN performance.
+
+```{r Binomial_GLM_Alternative}
+#| message: false
+#| warning: false
+# specify model formula for alternative model
+unsworth_formula_alternative <- bf(n_corr | trials(n_trials) ~  0 + Task + Task:zWMC + (0 + Task | Sub),
+                                   family = binomial)
+
+# set prior
+unsworth_prior_alternative <- prior(logistic(0,1), class = b, coef = "TaskProsaccade") +
+  prior(logistic(0,1), class = b, coef = "TaskAntisaccade") +
+  prior(logistic(0, 0.5), class = b, coef = "TaskProsaccade:zWMC") +
+  prior(logistic(0, 0.5), class = b, coef = "TaskAntisaccade:zWMC")
+
+# fit model
+unsworth_fit_alternative <- brm(unsworth_formula_alternative, 
+                                data = Unsworth_2023_E2_binomial, 
+                                family = binomial,
+                                prior = unsworth_prior_alternative,
+                                sample_prior = TRUE,
+                                chains = 4, 
+                                cores = 4, 
+                                iter = 20000, 
+                                warmup = 1000, 
+                                control = list(adapt_delta = 0.99),
+                                file = here("output","fit_unsworth_alternative"),
+                                file_refit = "on_change",
+                                backend = "cmdstanr")
+
+# print summary
+summary(unsworth_fit_alternative)
+```
+
+We can use these results of both these models to calculate the strength of evidence for OSPAN as a predictor of performance in the anti- and pro-saccade task.
+
+```{r HypothesisTests}
+# calculate hypothesis tests
+hyp_unsworth <- hypothesis(unsworth_fit, 
+                           c(wmc_main = "zWMC = 0",
+                             wmc_int = "Task1:zWMC = 0"))
+hyp_unsworth_alternative <- hypothesis(unsworth_fit_alternative, 
+                                       c(wmc_anti = "TaskAntisaccade:zWMC = 0",
+                                         wmc_pro = "TaskProsaccade:zWMC = 0",
+                                         wmc_diff = "TaskAntisaccade:zWMC = TaskProsaccade:zWMC"))
+```
+
+For the first model, there is inconclusive evidence for WMC prediciting performance irrespective of the task version, $BF_{10} = `r round(1/hyp_unsworth$hypothesis$Evid.Ratio[1],2)`$, however there is evidence against the interaction of WMC with the task predictor, $BF_{01} = `r round(hyp_unsworth$hypothesis$Evid.Ratio[2],2)`$. Thus, descriptively there is a tendency that higher WMC leads to equal increases in performance for both the pro- and anti-saccade task.
+
+```{r results_BGLM}
+# print summary of hypothesis tests
+hyp_unsworth
+```
+
+When looking at the evidence in the alternative specification of the BGLM. We find evidence for WMC predicting performance in the Anti-Saccade task, $BF_{10} = `r round( 1/hyp_unsworth_alternative$hypothesis$Evid.Ratio[1],2)`$, but inconclusive evidence with respect to WMC predicting performance in the Pro-Saccade task, $BF_{01} = `r round( hyp_unsworth_alternative$hypothesis$Evid.Ratio[2],2)`$. Nevertheless, when directly comparing how strongly WMC predicts performance in the pro- and anti-saccade task, there is strong evidence for these effects not differing, $BF_{01} = `r round(hyp_unsworth_alternative$hypothesis$Evid.Ratio[3],2)`$. This is a know issue, that the difference between credible and non-credible, is not necessarily credible itself. 
+
+For this case, there are two reasons for there being no difference in the prediction of performance in the pro- and anti-saccade condition, but different strengths of evidence when separately evaluating if WMC predicts performance in the anti- or the pro-saccade tasks:
+
+1. Individual differences in the pro-saccade task are measured less reliably due to ceiling effects.
+2. On the logit scale there are actually larger individual differences in the pro- then the anti-saccade task (see the SD estimates in the alternative specification of the Bayesian GLM), thus standardized effects (such as correlations) are likely smaller for the pro- compared to the anti-saccade task
+
+The first point leads to wider posteriors for the estimated relationship between OSPAN and performance in the pro-saccade task compared to the anti-saccade condition. And both point one and two explain why the descriptive correlation between OSPAN and performance in the pro- and anti-saccade task differ.
+
+```{r results_BGLM_alternative}
+# print summary of hypothesis tests
+hyp_unsworth_alternative
+```

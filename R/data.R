@@ -260,3 +260,17 @@
 #'   \item{z_total}{z-standardized total score.}
 #' }
 "Hood_2022_behavioral"
+
+#' Behavioral Data from Hood et al. (2022)
+#'
+#' @format ## `Unsworth_2023_E2_binomial`
+#' A data frame with 338 rows and 6 columns:
+#' \describe{
+#'   \item{Sub}{The subject ID}
+#'   \item{zWMC}{The standardized factor score from the three WMC (OSpan, SymSpan, & RSpan) tasks used in Unsworth et al. (2023)}
+#'   \item{Task}{Factor coding the task, either "Prosacccade" or "Antisaccade"}
+#'   \item{pc}{The proportion of correct responses.}
+#'   \item{n_corr}{The number of correctly identified letters.}
+#'   \item{n_trials}{The total number of trials in each task}
+#' }
+"Unsworth_2023_E2_binomial"
