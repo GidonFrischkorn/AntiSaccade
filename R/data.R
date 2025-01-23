@@ -188,6 +188,7 @@
 #'   \item{task}{The task within Experiment 9 from which the data stem from}
 #'   \item{ID}{Unique integer code for each subject who participated in the experiment}
 #'   \item{Block}{The experimental block a trial was part of.}
+#'   \item{block_order}{The position the experimental block was presented at.}
 #'   \item{trial}{The trial number of the current trial}
 #'   \item{cueLoc}{The cue location coded as a numeric value from 1 to 4.
 #'   1 = "top", 2 = "right", 3 = "bottom", 4 = "left"}
