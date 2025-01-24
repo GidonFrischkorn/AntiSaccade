@@ -1,0 +1,560 @@
+---
+title: "Additional Analyses: Experiment 2"
+author: "Gidon Frischkorn"
+format: html
+embed-resources: TRUE
+---
+
+```{r options, include = FALSE}
+knitr::opts_chunk$set(
+  eval = TRUE,
+  echo = FALSE,
+  output = TRUE,
+  warning = FALSE,
+  error = FALSE,
+  message = FALSE,
+  collapse = TRUE
+)
+```
+
+```{r setup}
+pacman::p_load_gh("GidonFrischkorn/AntiSaccade")
+pacman::p_load(papaja, here, lavaan, brms, dplyr, tidyr, ggplot2)
+options(mc.cores = parallel::detectCores())
+
+# plot settings
+plot_dodge <- 1
+jitter_width <- 1
+point_alpha <- 0.1
+```
+
+## Effects of Block order
+
+```{r code_block_order}
+Exp1_BlockOrder <- Exp1_data %>% 
+  filter(trial == 1) %>% 
+  select(ID, Block, block_order) %>% 
+  pivot_wider(names_from = Block, values_from = block_order) %>% 
+  mutate(anti_before_pro = ifelse(Anti - Pro < 0,"yes","no"),
+         anti_directly_before_pro = ifelse(Anti - Pro == -1, "yes", ifelse(Pro-Anti == -1, "no", NA))) %>% 
+  select(ID, anti_before_pro, anti_directly_before_pro)
+
+Exp1_BlockOrder_all <- Exp1_data %>% 
+  left_join(Exp1_BlockOrder, by = "ID")
+
+agg_data_Exp1 <- Exp1_BlockOrder_all %>%
+  dplyr::summarise(
+    correct = sum(correct),
+    nTrials = dplyr::n(),
+    .by = c(ID, Block, CTI, anti_before_pro, anti_directly_before_pro)
+  )
+
+Exp2_BlockOrder <- Exp2_data %>% 
+  filter(trial == 1) %>% 
+  select(ID, Block, block_order) %>% 
+  pivot_wider(names_from = Block, values_from = block_order) %>% 
+  mutate(anti_before_pro = ifelse(Anti - Pro < 0,"yes","no"),
+         anti_directly_before_pro = ifelse(Anti - Pro == -1, "yes", ifelse(Pro-Anti == -1, "no", NA))) %>% 
+  select(ID, anti_before_pro, anti_directly_before_pro)
+
+Exp2_BlockOrder_all <- Exp2_data %>% 
+  left_join(Exp2_BlockOrder, by = "ID")
+
+agg_data_Exp2 <- Exp2_BlockOrder_all %>%
+  dplyr::summarise(
+    correct = sum(correct),
+    nTrials = dplyr::n(),
+    .by = c(ID, Block, CTI, anti_before_pro, anti_directly_before_pro)
+  )
+```
+
+```{r}
+desc_plot_exp1 <- ggplot(data = agg_data_Exp1,
+                    aes(x = CTI, y = correct/nTrials, color = Block, fill = Block, 
+                        group = Block)) +
+  facet_grid(. ~ anti_before_pro) +
+  ggplot2::geom_jitter(position = ggplot2::position_jitterdodge(jitter.width = jitter_width, dodge.width = plot_dodge),
+                       alpha = point_alpha) +
+  stat_summary(position = position_dodge(plot_dodge), fun.data = mean_se) +
+  ggplot2::stat_summary(geom = "line", fun = "mean", position = ggplot2::position_dodge(plot_dodge)) +
+  geom_hline(yintercept = 0.33, color = "red", linetype = "dashed") +
+  labs(x = "Cue-Target Interval (ms)",
+       y = "Proportion Correct",
+       color = "Block", fill = "Block",
+       shape = "Pos Cue = Target",
+       title = "Descriptive Plot: : Anti-Saccade Block before Pro-Saccade") +
+  coord_cartesian(ylim = c(0,1)) +
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank())
+desc_plot_exp1
+```
+
+```{r}
+desc_plot2_exp1 <- ggplot(data = agg_data_Exp1,
+                    aes(x = CTI, y = correct/nTrials, color = Block, fill = Block, 
+                        group = Block)) +
+  facet_grid(. ~ anti_directly_before_pro) +
+  ggplot2::geom_jitter(position = ggplot2::position_jitterdodge(jitter.width = jitter_width, dodge.width = plot_dodge),
+                       alpha = point_alpha) +
+  stat_summary(position = position_dodge(plot_dodge), fun.data = mean_se) +
+  ggplot2::stat_summary(geom = "line", fun = "mean", position = ggplot2::position_dodge(plot_dodge)) +
+  geom_hline(yintercept = 0.33, color = "red", linetype = "dashed") +
+  labs(x = "Cue-Target Interval (ms)",
+       y = "Proportion Correct",
+       color = "Block", fill = "Block",
+       shape = "Pos Cue = Target",
+       title = "Descriptive Plot: Anti-Saccade Block directly before Pro-Saccade") +
+  coord_cartesian(ylim = c(0,1)) +
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank())
+desc_plot2_exp1
+```
+
+```{r}
+desc_plot_exp2 <- ggplot(data = agg_data_Exp2 %>% filter(CTI != 200),
+                    aes(x = as.factor(CTI), y = correct/nTrials, color = Block, fill = Block, 
+                        group = Block)) +
+  facet_grid(. ~ anti_before_pro) +
+  ggplot2::geom_jitter(position = ggplot2::position_jitterdodge(jitter.width = jitter_width, dodge.width = plot_dodge),
+                       alpha = point_alpha) +
+  stat_summary(position = position_dodge(plot_dodge), fun.data = mean_se) +
+  ggplot2::stat_summary(geom = "line", fun = "mean", position = ggplot2::position_dodge(plot_dodge)) +
+  geom_hline(yintercept = 0.33, color = "red", linetype = "dashed") +
+  labs(x = "Cue-Target Interval (ms)",
+       y = "Proportion Correct",
+       color = "Block", fill = "Block",
+       shape = "Pos Cue = Target",
+       title = "Descriptive Plot Exp2: : Anti-Saccade Block before Pro-Saccade") +
+  coord_cartesian(ylim = c(0,1)) +
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank())
+desc_plot_exp2
+```
+
+```{r}
+desc_plot2_exp2 <- ggplot(data = agg_data_Exp2 %>% filter(CTI != 200),
+                    aes(x = as.factor(CTI), y = correct/nTrials, color = Block, fill = Block, 
+                        group = Block)) +
+  facet_grid(. ~ anti_directly_before_pro) +
+  ggplot2::geom_jitter(position = ggplot2::position_jitterdodge(jitter.width = jitter_width, dodge.width = plot_dodge),
+                       alpha = point_alpha) +
+  stat_summary(position = position_dodge(plot_dodge), fun.data = mean_se) +
+  ggplot2::stat_summary(geom = "line", fun = "mean", position = ggplot2::position_dodge(plot_dodge)) +
+  geom_hline(yintercept = 0.33, color = "red", linetype = "dashed") +
+  labs(x = "Cue-Target Interval (ms)",
+       y = "Proportion Correct",
+       color = "Block", fill = "Block",
+       shape = "Pos Cue = Target",
+       title = "Descriptive Plot Exp2: Anti-Saccade Block directly before Pro-Saccade") +
+  coord_cartesian(ylim = c(0,1)) +
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank())
+desc_plot2_exp2
+```
+
+```{r Prep_WMCdata}
+data_WMC <- Exp2_WMC_data
+
+# extract PCA scores for WMC
+data_CS_proc <- Exp2_WMC_data %>% 
+  filter(task == "CS processing")
+
+nSub_CS_total <- length(unique(data_CS_proc$ID))
+
+# filter participants that did processing in CS task correctly
+data_CS_nonResp <- data_CS_proc %>% 
+  group_by(ID, retPos) %>% 
+  summarise(sdRT = sd(RTms),
+            meanRT = mean(RTms),
+            nMiss = sum(is.na(correct)),
+            nCorrect = sum(correct, na.rm = T),
+            nTrials = n(),
+            meanPC = nCorrect/nTrials
+  ) %>% 
+  filter(meanPC > .70)
+use_CS_IDs <- names(table(data_CS_nonResp$ID))[table(data_CS_nonResp$ID) == 2]
+
+nSub_CS <- length(use_CS_IDs)
+
+missing_CS <- (1 - (nSub_CS/nSub_CS_total))*100
+
+aggData_WMC <- data_WMC %>% 
+  filter(task != "CS processing", task != "CS") %>% 
+  group_by(ID,task,trialNum) %>% 
+  summarise(meanPC = mean(correct),
+            nCor = sum(correct),
+            nRet = n(),
+            setsize = mean(setsize)) %>% 
+  summarise(meanPC = mean(meanPC),
+            nRet = n()) %>% 
+  select(-nRet) %>% 
+  tidyr::pivot_wider(names_from = c(task),
+                     values_from = meanPC)
+
+aggData_WMC$nTaskMissing <- rowSums(is.na(aggData_WMC[,2:3]))
+
+aggData_WMC <- aggData_WMC %>% 
+  filter(nTaskMissing < 1)
+```
+
+```{r Prep_PSdata}
+# load data of covariates
+data_PS <- Exp2_PS_data
+
+data_HT <- Exp2_PS_data %>% 
+  filter(task == "HT")
+data_HT_outlier <- data_HT %>% 
+  mutate(outlier_RT = case_when(RTms < 50 ~ "fast",
+                                RTms > 5000 ~ "slow",
+                                is.na(correct) ~ "miss",
+                                TRUE ~ "no")) %>% 
+  group_by(ID,task, taskDiff, outlier_RT) %>%
+  summarise(nOutlier = n()) %>% 
+  tidyr::pivot_wider(names_from = outlier_RT,
+                     values_from = nOutlier) 
+data_HT_outlier[is.na(data_HT_outlier)] <- 0
+
+data_HT_outlier <- data_HT_outlier %>% 
+  mutate(nTrials = no + fast + slow + miss,
+         propValid = no/nTrials,
+         discard = ifelse(propValid < .80, "yes","no")) %>% 
+  filter(discard == "yes")
+
+ID_HT_outlier <- unique(data_HT_outlier$ID)
+
+data_HT_clean <- data_HT %>% 
+  filter(!ID %in% ID_HT_outlier)
+
+data_CJ <- Exp2_PS_data %>% 
+  filter(task == "CJ")
+
+data_CJ_outlier <- data_CJ %>% 
+  mutate(outlier_RT = case_when(RTms < 50 ~ "fast",
+                                RTms > 5000 ~ "slow",
+                                is.na(correct) ~ "miss",
+                                TRUE ~ "no")) %>% 
+  group_by(ID,task, taskDiff, outlier_RT) %>%
+  summarise(nOutlier = n()) %>% 
+  tidyr::pivot_wider(names_from = outlier_RT,
+                     values_from = nOutlier) 
+data_CJ_outlier[is.na(data_CJ_outlier)] <- 0
+
+data_CJ_outlier <- data_CJ_outlier %>% 
+  mutate(nTrials = no + fast + slow,
+         propValid = no/nTrials,
+         discard = ifelse(propValid < .80, "yes","no")) %>% 
+  filter(discard == "yes")
+
+ID_CJ_outlier <- unique(data_CJ_outlier$ID)
+
+data_CJ_clean <- data_CJ %>% 
+  filter(!ID %in% ID_CJ_outlier)
+
+data_NJ <- Exp2_PS_data %>% 
+  filter(task == "NJ")
+
+data_NJ_outlier <- data_NJ %>% 
+  mutate(outlier_RT = case_when(RTms < 50 ~ "fast",
+                                RTms > 5000 ~ "slow",
+                                is.na(correct) ~ "miss",
+                                TRUE ~ "no")) %>% 
+  group_by(ID,task, taskDiff, outlier_RT) %>%
+  summarise(nOutlier = n()) %>% 
+  tidyr::pivot_wider(names_from = outlier_RT,
+                     values_from = nOutlier) 
+data_NJ_outlier[is.na(data_NJ_outlier)] <- 0
+
+data_NJ_outlier <- data_NJ_outlier %>% 
+  mutate(nTrials = no + fast + slow,
+         propValid = no/nTrials,
+         discard = ifelse(propValid < .80, "yes","no")) %>% 
+  filter(discard == "yes")
+
+ID_NJ_outlier <- unique(data_NJ_outlier$ID)
+
+data_NJ_clean <- data_NJ %>% 
+  filter(!ID %in% ID_NJ_outlier)
+
+data_PS_clean <- rbind(data_HT_clean, data_CJ_clean, data_NJ_clean)
+
+aggData_PS <- data_PS_clean %>% 
+  filter(RTms > 50, RTms < 5000, !is.na(correct)) %>% 
+  mutate(RT = RTms/1000,
+         accuracy = ifelse(correct, 1, 0)) %>%  
+  group_by(ID, task) %>% 
+  summarise(v = ez.dm(RT = RT, ACC = accuracy, robust = TRUE)[1],
+            a = ez.dm(RT = RT, ACC = accuracy, robust = TRUE)[2],
+            t0 = ez.dm(RT = RT, ACC = accuracy, robust = TRUE)[3])  %>% 
+  tidyr::pivot_wider(names_from = c(task),
+                     values_from = c(v,a,t0))
+
+aggData_PS$nTaskMissing <- rowSums(is.na(aggData_PS[,2:10]))
+
+aggData_PS <- aggData_PS %>% 
+  filter(nTaskMissing <= 3)
+```
+
+```{r}
+fit_MM_PS_drift <- lavaan::sem(model = readLines(here("SEM","Exp9_MM_ProcSpeed.sem")),
+                               data = aggData_PS, std.lv = T, std.ov = T, orthogonal = T,
+                               missing = "ML")
+
+fit_MM_PS_bound <- lavaan::sem(model = readLines(here("SEM","Exp9_MM_ProcSpeed_bound.sem")),
+                               data = aggData_PS, std.lv = T, std.ov = T, orthogonal = T,
+                               missing = "ML")
+
+fit_MM_PS_t0 <- lavaan::sem(model = readLines(here("SEM","Exp9_MM_ProcSpeed_t0.sem")),
+                            data = aggData_PS, std.lv = T, std.ov = T, orthogonal = T,
+                            missing = "ML")
+
+# extract factor scores
+PS_scores <- data.frame(v = lavPredict(fit_MM_PS_drift),
+                        a = lavPredict(fit_MM_PS_bound),
+                        t0 = lavPredict(fit_MM_PS_t0))
+PS_scores$ID <- aggData_PS$ID
+
+fit_MM_WMC <- lavaan::sem(model = readLines(here("SEM","Exp9_MM_WMC.sem")),
+                          data = aggData_WMC, std.lv = T, std.ov = T, missing = "ML")
+
+# extract factor scores
+WMC_scores <- data.frame(lavPredict(fit_MM_WMC))
+WMC_scores$ID <- aggData_WMC$ID
+
+COV_scores <- PS_scores %>% full_join(WMC_scores)
+agg_data_Exp2 <- agg_data_Exp2 %>% left_join(COV_scores)
+```
+
+```{r}
+relEst_Exp1 <- Exp1_data |> 
+  mutate(OddEven = ifelse(trial %% 2 == 0, "even","odd")) |> 
+  group_by(ID, Block, CTI, OddEven) |>
+  summarise(propCorr = sum(correct)/n(), .groups = "drop") |> 
+  tidyr::pivot_wider(names_from = OddEven, values_from = propCorr) |>
+  group_by(Block, CTI) |> 
+  summarise(relEst = cor(odd, even, use = "complete.obs"),
+            relEst_corr = (2*relEst)/(1+relEst))
+
+df_corr_Blocks_Exp1 <- Exp1_data %>%
+  dplyr::summarise(
+    pc = sum(correct)/dplyr::n(),
+    .by = c(ID, Block)
+  ) %>% 
+  pivot_wider(
+    names_from = Block,
+    values_from = pc
+  )
+
+apaTables::apa.cor.table(df_corr_Blocks_Exp1[,2:6], file = "Cor_Blocks_Exp1.doc")
+```
+
+
+```{r}
+#| label: fig-covcorr
+#| fig-cap: "Correlations of average performance in the different experimental blocks of the manual anti-saccade task with working memory capacity (WMC) and processing speed (PS). The points indicate the correlation coefficient and error bars the 95% confindence interval."
+relEst_Exp2 <- Exp2_data %>% filter(CTI != 200) |> 
+  mutate(OddEven = ifelse(trial %% 2 == 0, "even","odd")) |> 
+  group_by(ID, Block, CTI, OddEven) |>
+  summarise(propCorr = sum(correct)/n(), .groups = "drop") |> 
+  tidyr::pivot_wider(names_from = OddEven, values_from = propCorr) |>
+  group_by(Block, CTI) |> 
+  summarise(relEst = cor(odd, even, use = "complete.obs"),
+            relEst_corr = (2*relEst)/(1+relEst))
+
+df_corr_Blocks_Exp2 <- Exp2_data %>%
+  dplyr::summarise(
+    pc = sum(correct)/dplyr::n(),
+    .by = c(ID, Block)
+  ) %>% 
+  pivot_wider(
+    names_from = Block,
+    values_from = pc
+  )
+
+apaTables::apa.cor.table(df_corr_Blocks_Exp2[,2:7], file = "Cor_Blocks_Exp2.doc")
+
+df_corr_descriptive <- Exp2_data %>% filter(CTI != 200) %>%
+  dplyr::group_by(ID, Block) %>%
+  dplyr::summarise(
+    correct = sum(correct),
+    nTrials = dplyr::n(),
+    .groups = "drop"
+  ) |> left_join(COV_scores) |> 
+  left_join(Exp2_BlockOrder, by = "ID") %>% 
+  group_by(Block, anti_directly_before_pro) |> 
+  summarise(
+    r_WMC_mean = cor(WMC_g, correct/nTrials, use = "complete.obs"),
+    r_PS_mean = cor(v, correct/nTrials, use = "complete.obs"),
+    n_WMC = n() - sum(is.na(WMC_g)),
+    n_PS = n() - sum(is.na(v))
+  ) |> 
+  left_join(relEst_Exp2) |> 
+  mutate(
+    r_WMC_relCor = r_WMC_mean/sqrt(relEst_corr),
+    r_PS_relCor = r_PS_mean/sqrt(relEst_corr),
+    r_WMC_mean_upper = tanh(atanh(r_WMC_mean) + qnorm(.975) * (1/sqrt(n_WMC))),
+    r_WMC_mean_lower = tanh(atanh(r_WMC_mean) + qnorm(.025) * (1/sqrt(n_WMC))),
+    r_PS_mean_upper = tanh(atanh(r_PS_mean) + qnorm(.975) * (1/sqrt(n_PS))),
+    r_PS_mean_lower = tanh(atanh(r_PS_mean) + qnorm(.025) * (1/sqrt(n_PS))),
+    r_WMC_relCor_upper = tanh(atanh(r_WMC_relCor) + qnorm(.975) * (1/sqrt(n_WMC))),
+    r_WMC_relCor_lower = tanh(atanh(r_WMC_relCor) + qnorm(.025) * (1/sqrt(n_WMC))),
+    r_PS_relCor_upper = tanh(atanh(r_PS_relCor) + qnorm(.975) * (1/sqrt(n_PS))),
+    r_PS_relCor_lower = tanh(atanh(r_PS_relCor) + qnorm(.025) * (1/sqrt(n_PS)))
+  ) |> 
+  tidyr::pivot_longer(cols = c(r_WMC_mean, r_PS_mean, r_WMC_mean_upper, r_WMC_mean_lower, r_PS_mean_upper, r_PS_mean_lower,
+                               r_WMC_relCor, r_PS_relCor, r_WMC_relCor_upper, r_WMC_relCor_lower, r_PS_relCor_upper, r_PS_relCor_lower), 
+                      names_to = "Covariate", values_to = "Correlation") |> 
+  mutate(pred = stringr::str_split_i(Covariate, "_", 2),
+         type = stringr::str_split_i(Covariate, "_", 3),
+         stat = stringr::str_split_i(Covariate, "_", 4),
+         stat = case_when(is.na(stat) ~ "point",
+                          TRUE ~ stat)) |> 
+  select(-Covariate) |>
+  tidyr::pivot_wider(names_from = stat, values_from = Correlation)
+df_corr_descriptive$pred <- as.factor(df_corr_descriptive$pred)
+
+plot_cor_descriptive <- ggplot(df_corr_descriptive |> filter(type == "relCor",
+                                                             Block %in% c("Anti","Pro")),
+                               aes(y = point, x = as.factor(anti_directly_before_pro), 
+                                   ymin = lower, ymax = upper, color = Block, group = Block)) +
+  facet_wrap(~ pred) +
+  geom_point(position = position_dodge(0.25), size = 2) +
+  geom_line(position = position_dodge(0.25)) +
+  geom_errorbar(width = 0, position = position_dodge(0.25)) +
+  labs(y = "Correlation", x = "Anti-Saccade Block before Pro-Saccade") +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank())
+plot_cor_descriptive
+```
+
+
+
+## Trial-to-trial effects on inhibition
+
+```{r}
+aggData_locRep_Exp1 <- Exp1_data %>% 
+  mutate(locRep = ifelse(stimLoc == lag(stimLoc),"yes","no"),
+         .by = c(ID,Block)) %>% 
+  summarise(n_corr = sum(correct),
+            n_trials = n(),
+            pc = n_corr/n_trials,
+            .by = c(ID,Block,locRep,CTI)) %>% 
+  filter(!is.na(locRep))
+
+plot_locRep_Exp1 <- ggplot(data = aggData_locRep_Exp1 %>% filter(Block != "NoSaccade"),
+       aes(x = as.factor(locRep), y = pc, color = Block, group = Block)) +
+  facet_grid(. ~ CTI, labeller = label_both) +
+  ggplot2::geom_jitter(position = ggplot2::position_jitterdodge(jitter.width = jitter_width, dodge.width = plot_dodge),
+                       alpha = point_alpha) +
+  stat_summary(position = position_dodge(plot_dodge), fun.data = mean_se) +
+  ggplot2::stat_summary(geom = "line", fun = "mean", position = ggplot2::position_dodge(plot_dodge)) +
+  geom_hline(yintercept = 0.33, color = "red", linetype = "dashed") +
+  labs(x = "Repetion of Target Location",
+       y = "Proportion Correct",
+       color = "Block", fill = "Block",
+       shape = "Pos Cue = Target",
+       title = "Descriptive Plot Exp1: Effect of Target Location Repetition") +
+  coord_cartesian(ylim = c(0,1)) +
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank())
+plot_locRep_Exp1
+```
+
+```{r}
+aggData_locRep_Exp2 <- Exp2_data %>% 
+  mutate(locRep = ifelse(stimLoc == lag(stimLoc),"yes","no"),
+         .by = c(ID,Block)) %>% 
+  summarise(n_corr = sum(correct),
+            n_trials = n(),
+            pc = n_corr/n_trials,
+            .by = c(ID,Block,locRep,CTI)) %>% 
+  filter(!is.na(locRep))
+
+plot_locRep_Exp2 <- ggplot(data = aggData_locRep_Exp2 %>% filter(CTI != 200, Block != "No"),
+       aes(x = as.factor(locRep), y = pc, color = as.factor(Block), group = as.factor(Block))) +
+  facet_grid(. ~ CTI, labeller = label_both) +
+  ggplot2::geom_jitter(position = ggplot2::position_jitterdodge(jitter.width = jitter_width, dodge.width = plot_dodge),
+                       alpha = point_alpha) +
+  stat_summary(position = position_dodge(plot_dodge), fun.data = mean_se) +
+  ggplot2::stat_summary(geom = "line", fun = "mean", position = ggplot2::position_dodge(plot_dodge)) +
+  geom_hline(yintercept = 0.33, color = "red", linetype = "dashed") +
+  labs(x = "Repetion of Target Location",
+       y = "Proportion Correct",
+       color = "Block", fill = "Block",
+       shape = "Pos Cue = Target",
+       title = "Descriptive Plot Exp2: Effect of Target Location Repetition") +
+  coord_cartesian(ylim = c(0,1)) +
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank())
+plot_locRep_Exp2
+```
+
+## Reliability & Correlation: Covariates
+
+```{r ReliabilityWMC}
+relData_WMC <- data_WMC %>% 
+  filter(task != "CS processing", task != "CS") %>% 
+  summarise(meanPC = mean(correct),
+            nCor = sum(correct),
+            nRet = n(),
+            setsize = mean(setsize),
+            .by = c(ID,task,trialNum,setsize)) %>% 
+  summarise(meanPC = mean(meanPC),
+            .by = c(ID,task,setsize)) %>% 
+  pivot_wider(names_from = setsize, values_from = meanPC,
+              names_glue = "SS_{setsize}")
+
+round(coeff_alpha(relData_WMC[relData_WMC$task == "STM",c("SS_3","SS_4","SS_5")]),3)
+round(coeff_alpha(relData_WMC[relData_WMC$task == "UP",c("SS_3","SS_4","SS_5")]),3)
+```
+
+
+```{r ReliabilityPS}
+relData_PS <- data_PS_clean %>% 
+  filter(RTms > 50, RTms < 5000, !is.na(correct)) %>% 
+  mutate(RT = RTms/1000,
+         accuracy = ifelse(correct, 1, 0)) %>% 
+  summarise(v = ez.dm(RT = RT, ACC = accuracy, robust = TRUE)[1],
+            a = ez.dm(RT = RT, ACC = accuracy, robust = TRUE)[2],
+            t0 = ez.dm(RT = RT, ACC = accuracy, robust = TRUE)[3],
+            .by = c(ID, task, taskDiff)) %>% 
+  pivot_wider(names_from = taskDiff, values_from = c(v,a,t0))
+
+round(coeff_alpha(relData_PS[relData_PS$task == "HT",c("v_medium","v_hard","v_easy")]),3)
+round(coeff_alpha(relData_PS[relData_PS$task == "CJ",c("v_medium","v_hard","v_easy")]),3)
+round(coeff_alpha(relData_PS[relData_PS$task == "NJ",c("v_medium","v_hard","v_easy")]),3)
+```
+
+```{r Covariates}
+aggData_Covariates <- aggData_PS %>% 
+  full_join(aggData_WMC, by = "ID")
+
+apaTables::apa.cor.table(aggData_Covariates[,c("v_CJ","v_HT","v_NJ","STM","UP")], filename = "Corr_Covariates.doc")
+
+fit_MM_PS_drift <- lavaan::sem(model = readLines(here("SEM","Exp9_MM_ProcSpeed.sem")),
+                               data = aggData_PS, std.lv = T, std.ov = T, orthogonal = T,
+                               missing = "ML")
+
+fit_MM_PS_bound <- lavaan::sem(model = readLines(here("SEM","Exp9_MM_ProcSpeed_bound.sem")),
+                               data = aggData_PS, std.lv = T, std.ov = T, orthogonal = T,
+                               missing = "ML")
+
+fit_MM_PS_t0 <- lavaan::sem(model = readLines(here("SEM","Exp9_MM_ProcSpeed_t0.sem")),
+                            data = aggData_PS, std.lv = T, std.ov = T, orthogonal = T,
+                            missing = "ML")
+
+# extract factor scores
+PS_scores <- data.frame(v = lavPredict(fit_MM_PS_drift),
+                        a = lavPredict(fit_MM_PS_bound),
+                        t0 = lavPredict(fit_MM_PS_t0))
+PS_scores$ID <- aggData_PS$ID
+
+fit_MM_WMC <- lavaan::sem(model = readLines(here("SEM","Exp9_MM_WMC.sem")),
+                          data = aggData_WMC, std.lv = T, std.ov = T, missing = "ML")
+
+# extract factor scores
+WMC_scores <- data.frame(lavPredict(fit_MM_WMC))
+WMC_scores$ID <- aggData_WMC$ID
+
+COV_scores <- PS_scores %>% full_join(WMC_scores)
+```
