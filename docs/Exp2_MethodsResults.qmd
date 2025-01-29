@@ -918,7 +918,7 @@ pp_plot_theoretical <- ggplot(data = tidy_pred_theoretical,
                data = agg_data, color = "black", shape = "cross",
                aes(x = as.factor(CTI_num*1000), y = correct/nTrials)) +
   geom_hline(yintercept = 0.33, color = "red", linetype = "dashed") +
-  labs(x = "Cue-Target Interval (in 1/100 ms)",
+  labs(x = "Cue-Target Interval (in ms)",
        y = "Proportion Correct",
        color = "Block", fill = "Block",
        shape = "Pos Cue = Target",
@@ -1069,7 +1069,7 @@ df_cor[which(df_cor$name == "Binding"),]$process <- ifelse(
 df_cor[which(df_cor$name == "arbBind"),]$process <- ifelse(
   df_cor[which(df_cor$name == "arbBind"),]$Block %in% bind_blocks, "yes", "no")
 df_cor[which(df_cor$name == "Capture"),]$process <- ifelse(
-  df_cor[which(df_cor$name == "Capture"),]$Block %in% bottomup_blocks, "no", "yes")
+  df_cor[which(df_cor$name == "Capture"),]$Block %in% bottomup_blocks, "yes", "no")
 df_cor[which(df_cor$name == "Saccade"),]$process <- ifelse(
   df_cor[which(df_cor$name == "Saccade"),]$Block %in% saccade_blocks, "yes", "no")
 

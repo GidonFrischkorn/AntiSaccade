@@ -35,7 +35,7 @@ Exp1_BlockOrder <- Exp1_data %>%
   filter(trial == 1) %>% 
   select(ID, Block, block_order) %>% 
   pivot_wider(names_from = Block, values_from = block_order) %>% 
-  mutate(anti_before_pro = ifelse(Anti - Pro < 0,"yes","no"),
+  mutate(anti_before_pro = ifelse(Anti - Pro < 0,"Anti before Pro","Anti after Pro"),
          anti_directly_before_pro = ifelse(Anti - Pro == -1, "yes", ifelse(Pro-Anti == -1, "no", NA))) %>% 
   select(ID, anti_before_pro, anti_directly_before_pro)
 
@@ -53,7 +53,7 @@ Exp2_BlockOrder <- Exp2_data %>%
   filter(trial == 1) %>% 
   select(ID, Block, block_order) %>% 
   pivot_wider(names_from = Block, values_from = block_order) %>% 
-  mutate(anti_before_pro = ifelse(Anti - Pro < 0,"yes","no"),
+  mutate(anti_before_pro = ifelse(Anti - Pro < 0,"Anti before Pro","Anti after Pro"),
          anti_directly_before_pro = ifelse(Anti - Pro == -1, "yes", ifelse(Pro-Anti == -1, "no", NA))) %>% 
   select(ID, anti_before_pro, anti_directly_before_pro)
 
@@ -82,7 +82,7 @@ desc_plot_exp1 <- ggplot(data = agg_data_Exp1,
        y = "Proportion Correct",
        color = "Block", fill = "Block",
        shape = "Pos Cue = Target",
-       title = "Descriptive Plot: : Anti-Saccade Block before Pro-Saccade") +
+       title = "Descriptive Plot Exp1: Anti-Saccade Block before Pro-Saccade") +
   coord_cartesian(ylim = c(0,1)) +
   theme_bw() +
   theme(panel.grid.major.x = element_blank())
@@ -324,6 +324,8 @@ COV_scores <- PS_scores %>% full_join(WMC_scores)
 agg_data_Exp2 <- agg_data_Exp2 %>% left_join(COV_scores)
 ```
 
+## Correlations across conditions: Experiment 1
+
 ```{r}
 relEst_Exp1 <- Exp1_data |> 
   mutate(OddEven = ifelse(trial %% 2 == 0, "even","odd")) |> 
@@ -333,6 +335,8 @@ relEst_Exp1 <- Exp1_data |>
   group_by(Block, CTI) |> 
   summarise(relEst = cor(odd, even, use = "complete.obs"),
             relEst_corr = (2*relEst)/(1+relEst))
+
+knitr::kable(relEst_Exp1, caption = "Reliability estimates for average peroformance in the different blocks across CTI conditions")
 
 df_corr_Blocks_Exp1 <- Exp1_data %>%
   dplyr::summarise(
@@ -347,10 +351,9 @@ df_corr_Blocks_Exp1 <- Exp1_data %>%
 apaTables::apa.cor.table(df_corr_Blocks_Exp1[,2:6], file = "Cor_Blocks_Exp1.doc")
 ```
 
+## Correlations across conditions: Experiment 2
 
 ```{r}
-#| label: fig-covcorr
-#| fig-cap: "Correlations of average performance in the different experimental blocks of the manual anti-saccade task with working memory capacity (WMC) and processing speed (PS). The points indicate the correlation coefficient and error bars the 95% confindence interval."
 relEst_Exp2 <- Exp2_data %>% filter(CTI != 200) |> 
   mutate(OddEven = ifelse(trial %% 2 == 0, "even","odd")) |> 
   group_by(ID, Block, CTI, OddEven) |>
@@ -359,6 +362,8 @@ relEst_Exp2 <- Exp2_data %>% filter(CTI != 200) |>
   group_by(Block, CTI) |> 
   summarise(relEst = cor(odd, even, use = "complete.obs"),
             relEst_corr = (2*relEst)/(1+relEst))
+
+knitr::kable(relEst_Exp2, caption = "Reliability estimates for average peroformance in the different blocks across CTI conditions")
 
 df_corr_Blocks_Exp2 <- Exp2_data %>%
   dplyr::summarise(
@@ -372,6 +377,20 @@ df_corr_Blocks_Exp2 <- Exp2_data %>%
 
 apaTables::apa.cor.table(df_corr_Blocks_Exp2[,2:7], file = "Cor_Blocks_Exp2.doc")
 
+relEst_Exp2 <- Exp2_data %>% filter(CTI != 200) |> 
+  mutate(OddEven = ifelse(trial %% 2 == 0, "even","odd")) |> 
+  group_by(ID, Block, OddEven) |>
+  summarise(propCorr = sum(correct)/n(), .groups = "drop") |> 
+  tidyr::pivot_wider(names_from = OddEven, values_from = propCorr) |>
+  group_by(Block) |> 
+  summarise(relEst = cor(odd, even, use = "complete.obs"),
+            relEst_corr = (2*relEst)/(1+relEst))
+```
+
+
+```{r}
+#| label: fig-covcorr
+#| fig-cap: "Correlations of average performance in the different experimental blocks of the manual anti-saccade task with working memory capacity (WMC) and processing speed (PS). The points indicate the correlation coefficient and error bars the 95% confindence interval."
 df_corr_descriptive <- Exp2_data %>% filter(CTI != 200) %>%
   dplyr::group_by(ID, Block) %>%
   dplyr::summarise(
@@ -504,8 +523,12 @@ relData_WMC <- data_WMC %>%
   pivot_wider(names_from = setsize, values_from = meanPC,
               names_glue = "SS_{setsize}")
 
-round(coeff_alpha(relData_WMC[relData_WMC$task == "STM",c("SS_3","SS_4","SS_5")]),3)
-round(coeff_alpha(relData_WMC[relData_WMC$task == "UP",c("SS_3","SS_4","SS_5")]),3)
+print(paste("Relibility Esitmate - Binding Task:",
+            round(coeff_alpha(relData_WMC[relData_WMC$task == "STM",c("SS_3","SS_4","SS_5")]),3)))
+
+print(paste("Relibility Esitmate - Updating Task:",
+            round(coeff_alpha(relData_WMC[relData_WMC$task == "UP",c("SS_3","SS_4","SS_5")]),3)))
+
 ```
 
 
@@ -520,9 +543,13 @@ relData_PS <- data_PS_clean %>%
             .by = c(ID, task, taskDiff)) %>% 
   pivot_wider(names_from = taskDiff, values_from = c(v,a,t0))
 
-round(coeff_alpha(relData_PS[relData_PS$task == "HT",c("v_medium","v_hard","v_easy")]),3)
-round(coeff_alpha(relData_PS[relData_PS$task == "CJ",c("v_medium","v_hard","v_easy")]),3)
-round(coeff_alpha(relData_PS[relData_PS$task == "NJ",c("v_medium","v_hard","v_easy")]),3)
+
+print(paste("Relibility Esitmate - Choice RT Task:",
+            round(coeff_alpha(relData_PS[relData_PS$task == "HT",c("v_medium","v_hard","v_easy")]),3)))
+print(paste("Relibility Esitmate - Color Judgement Task:",
+            round(coeff_alpha(relData_PS[relData_PS$task == "CJ",c("v_medium","v_hard","v_easy")]),3)))
+print(paste("Relibility Esitmate - Number Judgement Task:",
+            round(coeff_alpha(relData_PS[relData_PS$task == "NJ",c("v_medium","v_hard","v_easy")]),3)))
 ```
 
 ```{r Covariates}
