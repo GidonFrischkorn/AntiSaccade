@@ -399,7 +399,7 @@ df_corr_descriptive <- Exp2_data %>% filter(CTI != 200) %>%
     .groups = "drop"
   ) |> left_join(COV_scores) |> 
   left_join(Exp2_BlockOrder, by = "ID") %>% 
-  group_by(Block, anti_directly_before_pro) |> 
+  group_by(Block, anti_before_pro) |> 
   summarise(
     r_WMC_mean = cor(WMC_g, correct/nTrials, use = "complete.obs"),
     r_PS_mean = cor(v, correct/nTrials, use = "complete.obs"),
@@ -433,7 +433,7 @@ df_corr_descriptive$pred <- as.factor(df_corr_descriptive$pred)
 
 plot_cor_descriptive <- ggplot(df_corr_descriptive |> filter(type == "relCor",
                                                              Block %in% c("Anti","Pro")),
-                               aes(y = point, x = as.factor(anti_directly_before_pro), 
+                               aes(y = point, x = as.factor(anti_before_pro), 
                                    ymin = lower, ymax = upper, color = Block, group = Block)) +
   facet_wrap(~ pred) +
   geom_point(position = position_dodge(0.25), size = 2) +
