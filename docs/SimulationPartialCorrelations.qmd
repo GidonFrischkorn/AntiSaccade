@@ -14,14 +14,14 @@ pacman::p_load(AntiSaccade, SimDesign, brms, bayestestR, rstatix, ppcor, tidyver
 
 ## Theoretical Background
 
-We simulated data for a theoretical model that assumes that working memory capacity (WMC) is determined by binding ability and other processes ($R_{WMC}$). Similarly, a latent ability $\theta$ that determines performance in the Pro- ($\theta_{Pro}$) and Anti-Saccade task ($\theta_{Anti}$), is assumed to be partly determined by the same binding ability. The number of correct responses in the Pro- and Anti-Saccade task is then simulated based on the logit transformed latent ability $logit(\theta)$ using a binomial distribution with a given number of trials, $N_{trials}$. 
+We simulated data for a theoretical model that implements our assumption that working memory capacity (WMC) only shares binding ability with pro- and anti-saccade performance. WMC is determined by binding ability and other processes ($R_{WMC}$). Similarly, a latent ability $\theta$ that determines performance in the Pro- ($\theta_{Pro}$) and Anti-Saccade task ($\theta_{Anti}$), is assumed to be partly determined by the same binding ability. The number of correct responses in the Pro- and Anti-Saccade task is then simulated based on the logit transformed latent ability $logit(\theta)$ using a binomial distribution with a given number of trials, $N_{trials}$. 
 
 ```{r}
 #| echo: false
 knitr::include_graphics("SimulationModel.jpg")
 ```
 
-The goal of this simulation is to evaluate if partial correlations controlling for variance of Pro-Saccaade performance in both Anti-Saccade performance and WMC are able to adequately represent that Pro- and Anti-Saccade performance are related to WMC only via the same binding ability. Here is my commentary
+The goal of this simulation is to evaluate if partial correlations controlling for variance of Pro-Saccaade performance in both Anti-Saccade performance and WMC are able to adequately diagnose that Pro- and Anti-Saccade performance are related to WMC only via the same binding ability. To adequately diagnose that, the partial correlations should be substantially reduced relative to the zero-order correlations, and not significant. 
 
 ## Simulation
 
@@ -113,7 +113,7 @@ example_data <- generate_data(condition = simulation_conditions[1,])
 head(example_data)
 ```
 
-We then calculated the zero order correlations between the number of correct responses in the Pro- and Anti-Saccade task, the WMC variable. In addition, we calculated the partial correlations controlling for variance in Pro- and Anti-Saccade performance respectively. The detailed function that analyzes the data is printed below:
+We then calculated the zero order correlations between the number of correct responses in the Pro- and Anti-Saccade task, the WMC variable. In addition, we calculated the partial correlations controlling for variance in Pro- and Anti-Saccade performance. respectively. The detailed function that analyzes the data is printed below:
 
 ```{r Analyze Data}
 #| warning: false
@@ -153,7 +153,7 @@ example_results <- analyze_data(dat = example_data, condition = simulation_condi
 example_results
 ```
 
-To summarize the simulation results we calculated the mean and 95% confidence intervals for the zero order and partial correlations, as well as the difference between the zero order and partial correlations.
+To summarize the simulation results we calculated the mean and 95% confidence intervals for the zero-order and the partial correlations, as well as the difference between the zero-order and the partial correlations.
 
 ```{r summarise results}
 #| echo: false
@@ -254,7 +254,7 @@ ggplot(results_parCorr_long %>% filter(meausure != "diff", variables != "AntiPro
        color = "Performance Difference\nPro vs. Anti") 
 ```
 
-As can be seen in @fig-parCor, the zero order correlations between WMC and Pro-Saccade performance are reduced when controlling for variance in Anti-Saccade performance. However, the zero-order correlations between Anti-Saccade performance and WMC are only reduced when performance in the Pro-Saccade condition is either sufficiently far away from ceiling or there are sufficiently many trials to still capture variance very close to ceiling. But even when performance in the pro-saccade task is not at ceiling and with sufficient data per participant the reduction is consistently larger when controlling for variance in Pro-Saccade performance (see @fig-diff-parCor).
+As can be seen in @fig-parCor, the zero-order correlations between WMC and Pro-Saccade performance are reduced when controlling for variance in Anti-Saccade performance. However, the zero-order correlations between Anti-Saccade performance and WMC (left panels) are only reduced when performance in the Pro-Saccade condition is either sufficiently far away from ceiling or there are sufficiently many trials to still capture variance very close to ceiling. But even when performance in the pro-saccade task is not at ceiling and with sufficient data per participant, the reduction is consistently larger for the correlation of WMC with Pro-Saccade performance (controlling for Anti-Saccade) than for the correlation of WMC with Anti-Saccade (controlling for Pro-Saccade) (see @fig-diff-parCor).
 
 ```{r}
 #| echo: false
@@ -298,7 +298,7 @@ ggplot(data = results_EDR_long,
 
 ## Simulation: Bayesian Binomial Model
 
-We compared the traditional approach analyzing the unique relationship of Anti- vs- Pro-Saccade performance with a Bayesian Binomial model that inlcudes WMC as a predictor of performance in both tasks. By using a treatment coding for the `Task` variable coding the pro-saccade task as the reference level, the interaction of `TaskWMC` can be interpreted as the difference in the relationship of WMC with Pro- and Anti-Saccade performance. The detailed function used for the analysis is printed below:
+We compared the traditional approach analyzing the unique relationship of Anti- vs- Pro-Saccade performance with a Bayesian Binomial model that includes WMC as a predictor of performance in both tasks. By using a treatment coding for the `Task` variable coding the pro-saccade task as the reference level, the interaction of Task and WMC (variable `TaskWMC`) can be interpreted as the difference in the relationship of WMC with Pro- and Anti-Saccade performance. The detailed function used for the analysis is printed below:
 
 ```{r}
 analyze_bayesian <- function(dat, condition, fixed_objects = NULL) {
@@ -418,7 +418,7 @@ results_bayesian_long$w <- as.factor(results_bayesian_long$w)
 levels(results_bayesian_long$w) <- c("Pro: 100%")
 ```
 
-First, we looked if the Bayesian Binomial model is able to correctly reject that the relationship of Anti- and Pro-Saccade performance with WMC differs. For this, we plotted the Bayes Factors for the main and interaction effects (see @fig-bf-binomial). The dashed lines in the plot indicate the threshold of $BF_{10} = 3$ and $BF_{01} = 3$, which can be interpreted as thresholds for moderate evidence for the alternative or null hypothesis respectively. The results indicate that there is consitently evidence for the main effect of WMC, but not for the interaction of WMC with Task. Thus, the Bayesian Binomial model detects the relationship of Pro- and Anti-Saccade performance with WMC, while also providing evidence that the relationship does not differ between the two tasks.
+First, we looked if the Bayesian Binomial model is able to correctly reject the hypothesis that the relationship of Anti- and Pro-Saccade performance with WMC differs. For this, we plotted the Bayes Factors for the main and interaction effects (see @fig-bf-binomial). The dashed lines in the plot indicate the threshold of $BF_{10} = 3$ and $BF_{01} = 3$, which can be interpreted as thresholds for moderate evidence for the alternative or null hypothesis, respectively. There is compelling evidence for the main effect of WMC, but evidence against the interaction of WMC with Task. Thus, the Bayesian Binomial model detects the relationship of Pro- and Anti-Saccade performance with WMC, while also providing evidence that the relationship does not differ between the two tasks.
 
 ```{r}
 #| echo: false
@@ -437,7 +437,7 @@ ggplot(results_bayesian_long %>% filter(meausure == "BF"),
        title = "Bayes Factors for main and interaction effects in the Bayesian Binomial Model")
 ```
 
-In fact, when looking at the regression coefficients (see @fig-b-binomial), we can see that the regression coefficients for WMC are consistently positive and the interaction of WMC with Task is close to zero and if different from zero negative. If anything the model is biased towards underestimating the relationship between WMC and Anti-Saccade performance, as the negative interaction effect indicates that the relationship of WMC with Anti-Saccade performance is smaller than the relationship of WMC with Pro-Saccade performance. In contrast to the analysis of partial correlations the Bayesian Binomial model is thus able to correctly detect that Pro- and Anti-Saccade performance are related to WMC via the same binding ability and only differ in the absolute performance level. 
+In fact, when looking at the regression coefficients (see @fig-b-binomial), we can see that the regression coefficients for WMC are consistently positive and the interaction of WMC with Task is close to zero, and if different from zero if is negative. If anything, the model is biased towards underestimating the relationship between WMC and Anti-Saccade performance, as the negative interaction effect indicates that the relationship of WMC with Anti-Saccade performance is smaller than the relationship of WMC with Pro-Saccade performance. In contrast to the analysis of partial correlations the Bayesian Binomial model is thus able to correctly detect that Pro- and Anti-Saccade performance are related to WMC via the same binding ability and only differ in the absolute performance level. 
 
 ```{r}
 #| echo: false
