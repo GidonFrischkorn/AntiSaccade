@@ -21,7 +21,7 @@ We simulated data for a theoretical model that assumes that working memory capac
 knitr::include_graphics("SimulationModel.jpg")
 ```
 
-The goal of this simulation is to evaluate if partial correlations controlling for variance of Pro-Saccaade performance in both Anti-Saccade performance and WMC are able to adequately represent that Pro- and Anti-Saccade performance are related to WMC only via the same binding ability.
+The goal of this simulation is to evaluate if partial correlations controlling for variance of Pro-Saccaade performance in both Anti-Saccade performance and WMC are able to adequately represent that Pro- and Anti-Saccade performance are related to WMC only via the same binding ability. Here is my commentary
 
 ## Simulation
 
