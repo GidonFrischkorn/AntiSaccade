@@ -1,0 +1,455 @@
+---
+title: "Simulation: Partial Correlations of WMC with Pro- and AntiSaccade performance"
+author: "Klaus Oberauer & Gidon Frischkorn"
+format: html
+embed-resources: TRUE
+---
+
+```{r}
+#| echo: false
+
+pacman::p_load(AntiSaccade, SimDesign, brms, bayestestR, rstatix, ppcor, tidyverse)
+```
+
+
+## Theoretical Background
+
+We simulated data for a theoretical model that assumes that working memory capacity (WMC) is determined by binding ability and other processes ($R_{WMC}$). Similarly, a latent ability $\theta$ that determines performance in the Pro- ($\theta_{Pro}$) and Anti-Saccade task ($\theta_{Anti}$), is assumed to be partly determined by the same binding ability. The number of correct responses in the Pro- and Anti-Saccade task is then simulated based on the logit transformed latent ability $logit(\theta)$ using a binomial distribution with a given number of trials, $N_{trials}$. 
+
+```{r}
+#| echo: false
+knitr::include_graphics("SimulationModel.jpg")
+```
+
+The goal of this simulation is to evaluate if partial correlations controlling for variance of Pro-Saccaade performance in both Anti-Saccade performance and WMC are able to adequately represent that Pro- and Anti-Saccade performance are related to WMC only via the same binding ability.
+
+## Simulation
+
+For the simulation we varied the following parameters:
+
+1) the difference in performance between Pro- and Anti-Saccade trials was varied over three levels, with Anti-Saccade performance at an average level of 60 % correct responses, and Pro-Saccade performance at 90%, 95%, or 98%
+2) the number of trials was varied over three levels, with 42, 100, or 200 trials per condition
+
+The other parameters were held constant across all simulations. The parameters were set to the following values:
+
+- $N_{trials} = 42$ (number of trials per condition)
+- $w = 1$ (proportion of variance in Pro-Saccade performance relative to Anti-Saccade explained by binding ability)
+- $b_1 = 0.7$ (standardized loading weight of binding ability on Pro- and Anti-Saccade performance)
+- $b_2 = 0.5$ (standardized loading weight of binding ability on WMC)
+- $sd_{Pro} = 0.7$ (standard deviation of Pro-Saccade performance (on logit scale))
+- $sd_{Anti} = 0.5$ (standard deviation of Anti-Saccade performance (on logit scale))
+
+```{r Simulation Settings}
+simulation_repetitions <- 1000
+
+performance_pro <- c(0.90, 0.95, 0.98)
+performance_anti <- 0.60
+
+simulation_conditions <- createDesign(
+  w = c(1),
+  diff_Anti_Pro = logit_scaled(performance_pro) - logit_scaled(performance_anti),
+  b1 = c(0.7),
+  b2 = c(0.5),
+  n_trials = c(42,100,200),
+  n_sub = 169,
+  intercept_AntiSaccade = c(logit_scaled(performance_anti)),
+  sd_Prosaccade = c(0.7),
+  sd_Antisaccade = c(0.5)
+)
+```
+
+Individual differences in the binding strength were simulated using a normal distribution with a mean of 0 and a standard deviation of 1. The binding ability was then used to simulate WMC and the latent ability $\theta$ for Pro- and Anti-Saccade performance. The function we used to generate the data based on the above described model is printed below:
+
+```{r Generate Data}
+#| warning: false
+generate_data <- function(condition, fixed_objects = NULL) {
+  Attach(condition)
+  
+  sim_data <- data.frame(
+    ID = rep(1:n_sub, times = 2),
+    Task = rep(c("Prosaccade","Antisaccade"), each = n_sub),
+    theta = NaN,
+    n_trials = n_trials,
+    n_corr = NaN,
+    pC = NaN
+  )
+  
+  # simulate n_corr in both pro- and anti-saccade conditions based on the same latent ability (binding strength), partially determined by WMC
+  bstrength = rnorm(n_sub, 0, 1)
+  
+  # some of the ability is specific to the pro-/anti- condition. Pro is easier than anti, therefore add a larger constant
+  z_theta_Pro <- w*b1*bstrength + sqrt(1-(w*b1)^2)*rnorm(n_sub, 0, 1)
+  z_theta_Anti <- (b1*bstrength + sqrt(1-b1^2)*rnorm(n_sub, 0, 1))
+  
+  # simulate WMC based on the binding strength
+  WMC = b2*bstrength + sqrt(1-b2^2)*rnorm(n_sub, 0, 1)
+  
+  # convert theta from the z-scale to the predefined scale
+  sim_data$theta[sim_data$Task=="Prosaccade"] <- z_theta_Pro * sd_Prosaccade + intercept_AntiSaccade + diff_Anti_Pro  
+  sim_data$theta[sim_data$Task=="Antisaccade"] <- z_theta_Anti * sd_Antisaccade + intercept_AntiSaccade
+  
+  # simulate data for both tasks
+  sim_data$n_corr <- rbinom(nrow(sim_data), size=sim_data$n_trials, prob=inv_logit_scaled(sim_data$theta))
+  sim_data$pC <- sim_data$n_corr/n_trials
+  
+  # collect simulated data
+  df <- data.frame(
+    ID = sim_data$ID[sim_data$Task=="Prosaccade"],
+    nCorr_Anti = sim_data$n_corr[sim_data$Task == "Antisaccade"], 
+    nCorr_Pro = sim_data$n_corr[sim_data$Task == "Prosaccade"],
+    nTrials_Anti = n_trials,
+    nTrials_Pro = n_trials,
+    pc_Anti = sim_data$pC[sim_data$Task=="Antisaccade"], 
+    pc_Pro = sim_data$pC[sim_data$Task=="Prosaccade"], 
+    WMC = WMC,
+    bstrength = bstrength,
+    theta_Pro = sim_data$theta[sim_data$Task=="Prosaccade"],
+    theta_Anti = sim_data$theta[sim_data$Task=="Antisaccade"])
+  df$pc_diff_Pro.Anti = df$pc_Pro - df$pc_Anti
+  return(df)
+}
+
+example_data <- generate_data(condition = simulation_conditions[1,])
+head(example_data)
+```
+
+We then calculated the zero order correlations between the number of correct responses in the Pro- and Anti-Saccade task, the WMC variable. In addition, we calculated the partial correlations controlling for variance in Pro- and Anti-Saccade performance respectively. The detailed function that analyzes the data is printed below:
+
+```{r Analyze Data}
+#| warning: false
+
+analyze_data <- function(dat, condition, fixed_objects) {
+  # calculate correlations
+  cor_matrix <- cor_mat(dat[,c("nCorr_Anti","nCorr_Pro","WMC")])
+  pvalues_cor <- cor_get_pval(cor_matrix)
+  
+  partial_cor_matrix <- pcor(dat[,c("nCorr_Anti","nCorr_Pro","WMC")])
+  
+  est_correlations = c("r_Anti_Pro" = cor_matrix$nCorr_Anti[cor_matrix$rowname == "nCorr_Pro"],
+                       "r_Anti_WMC" = cor_matrix$nCorr_Anti[cor_matrix$rowname == "WMC"],
+                       "r_Pro_WMC" = cor_matrix$nCorr_Pro[cor_matrix$rowname == "WMC"],
+                       "rpar_Anti_WMC" = partial_cor_matrix$estimate[1,3],
+                       "rpar_Pro_WMC" = partial_cor_matrix$estimate[2,3])
+  pvalues = c("p_r_Anti_Pro" = pvalues_cor$nCorr_Anti[pvalues_cor$rowname == "nCorr_Pro"],
+              "p_r_Anti_WMC" = pvalues_cor$nCorr_Anti[pvalues_cor$rowname == "WMC"],
+              "p_r_Pro_WMC" = pvalues_cor$nCorr_Pro[pvalues_cor$rowname == "WMC"],
+              "p_rpar_Anti_WMC" = partial_cor_matrix$p.value[1,3],
+              "p_rpar_Pro_WMC" = partial_cor_matrix$p.value[2,3])
+  
+  diff <- c(
+    "diff_Anti.WMC" = est_correlations["r_Anti_WMC"] - est_correlations["rpar_Anti_WMC"],
+    "diff_Pro.WMC" = est_correlations["r_Pro_WMC"] - est_correlations["rpar_Pro_WMC"]
+  )
+  names(diff) <- c("diff_Anti.WMC", "diff_Pro.WMC")
+  
+  results <- c(est_correlations,
+               pvalues,
+               diff)
+  
+  return(results)
+}
+
+example_results <- analyze_data(dat = example_data, condition = simulation_conditions[1,])
+example_results
+```
+
+To summarize the simulation results we calculated the mean and 95% confidence intervals for the zero order and partial correlations, as well as the difference between the zero order and partial correlations.
+
+```{r summarise results}
+#| echo: false
+summarise_simulation <- function(condition, results, fixed_objects) {
+  mean_results <- colMeans(results)
+  quantile_results <- t(apply(results, 2, quantile, probs = c(0.025, 0.975)))
+  corr_difference <- cor(results[,c("diff_Anti.WMC", "diff_Pro.WMC")])
+  
+  prop_p_signigicant <- colMeans(results[,c("p_r_Anti_Pro","p_r_Anti_WMC","p_r_Pro_WMC","p_rpar_Anti_WMC","p_rpar_Pro_WMC")] < 0.05)
+  
+  ret <- c(mean_r_AntiPro = mean_results["r_Anti_Pro"],
+           mean_r_AntiWMC = mean_results["r_Anti_WMC"],
+           mean_r_ProWMC = mean_results["r_Pro_WMC"],
+           mean_rpar_AntiWMC = mean_results["rpar_Anti_WMC"],
+           mean_rpar_ProWMC = mean_results["rpar_Pro_WMC"],
+           mean_diff_AntiWMC = mean_results["diff_Anti.WMC"],
+           mean_diff_ProWMC = mean_results["diff_Pro.WMC"],
+           quantileLow_r_AntiPro = quantile_results["r_Anti_Pro",1],
+           quantileLow_r_AntiWMC = quantile_results["r_Anti_WMC",1],
+           quantileLow_r_ProWMC = quantile_results["r_Pro_WMC",1],
+           quantileLow_rpar_AntiWMC = quantile_results["rpar_Anti_WMC",1],
+           quantileLow_rpar_ProWMC = quantile_results["rpar_Pro_WMC",1],
+           quantileLow_diff_AntiWMC = quantile_results["diff_Anti.WMC",1],
+           quantileLow_diff_ProWMC = quantile_results["diff_Pro.WMC",1],
+           quantileHigh_r_AntiPro = quantile_results["r_Anti_Pro",2],
+           quantileHigh_r_AntiWMC = quantile_results["r_Anti_WMC",2],
+           quantileHigh_r_ProWMC = quantile_results["r_Pro_WMC",2],
+           quantileHigh_rpar_AntiWMC = quantile_results["rpar_Anti_WMC",2],
+           quantileHigh_rpar_ProWMC = quantile_results["rpar_Pro_WMC",2],
+           quantileHigh_diff_AntiWMC = quantile_results["diff_Anti.WMC",2],
+           quantileHigh_diff_ProWMC = quantile_results["diff_Pro.WMC",2],
+           corr_difference = corr_difference[1,2],
+           prop_p_signigicant = prop_p_signigicant)
+  
+  names(ret) <- c("mean_r_AntiPro", "mean_r_AntiWMC", "mean_r_ProWMC", "mean_rpar_AntiWMC", "mean_rpar_ProWMC",
+                  "mean_diff_AntiWMC", "mean_diff_ProWMC",
+                  "quantileLow_r_AntiPro", "quantileLow_r_AntiWMC", "quantileLow_r_ProWMC", "quantileLow_rpar_AntiWMC", "quantileLow_rpar_ProWMC",
+                  "quantileLow_diff_AntiWMC", "quantileLow_diff_ProWMC",
+                  "quantileHigh_r_AntiPro", "quantileHigh_r_AntiWMC", "quantileHigh_r_ProWMC", "quantileHigh_rpar_AntiWMC", "quantileHigh_rpar_ProWMC",
+                  "quantileHigh_diff_AntiWMC", "quantileHigh_diff_ProWMC",
+                  "corr_differences",
+                  "EDR_r_AntiPro","EDR_r_AntiWMC","EDR_r_ProWMC","EDR_rpar_AntiWMC","EDR_rpar_ProWMC")
+  
+  ret
+}
+```
+
+## Run Simulation
+
+```{r}
+#| message: false
+#| warning: false
+if(!file.exists("simulation_frequentists_results.rds")) {
+  results_parCorr <- runSimulation(design = simulation_conditions, 
+                                    replications = simulation_repetitions, 
+                                    generate = generate_data, 
+                                    analyse = analyze_data, 
+                                    summarise = summarise_simulation,
+                                    parallel = TRUE,
+                                    filename = "simulation_frequentists_results.rds")
+} else {
+  # load the results if they already exist
+  results_parCorr <- readRDS("simulation_frequentists_results.rds")
+}
+
+results_parCorr$diff_Anti_Pro <- as.factor(results_parCorr$diff_Anti_Pro)
+levels(results_parCorr$diff_Anti_Pro) <- c(".60 vs .92", ".60 vs .95", ".60 vs .98")
+
+results_parCorr$w <- as.factor(results_parCorr$w)
+levels(results_parCorr$w) <- c("Pro: 100%")
+```
+
+```{r}
+#| echo: false
+results_parCorr_long <- results_parCorr %>% 
+  pivot_longer(cols = mean_r_AntiPro:quantileHigh_diff_ProWMC, names_to = "indicator", values_to = "Value") %>% 
+  mutate(statistic = str_split_i(indicator,"_",1),
+         meausure = str_split_i(indicator,"_",2),
+         variables = str_split_i(indicator,"_",3)) %>% 
+  select(-indicator) %>% 
+  pivot_wider(names_from = statistic, values_from = Value)
+
+
+```
+
+```{r}
+#| echo: false
+#| label: fig-parCor
+#| fig-cap: "Reduction in correlation with WMC when to controlling for Pro- or Anti-Saccade performance"
+
+ggplot(results_parCorr_long %>% filter(meausure != "diff", variables != "AntiPro"),
+       aes(y = mean, ymin = quantileLow, ymax = quantileHigh, x = meausure, color = diff_Anti_Pro, group = diff_Anti_Pro)) +
+  facet_grid(n_trials ~ variables, labeller = label_both) +
+  geom_pointrange(position = position_dodge(0.1)) + 
+  geom_line(position = position_dodge(0.1)) +
+  labs(y = "Correlation",
+       x = "Type of Correlation",
+       color = "Performance Difference\nPro vs. Anti") 
+```
+
+As can be seen in @fig-parCor, the zero order correlations between WMC and Pro-Saccade performance are reduced when controlling for variance in Anti-Saccade performance. However, the zero-order correlations between Anti-Saccade performance and WMC are only reduced when performance in the Pro-Saccade condition is either sufficiently far away from ceiling or there are sufficiently many trials to still capture variance very close to ceiling. But even when performance in the pro-saccade task is not at ceiling and with sufficient data per participant the reduction is consistently larger when controlling for variance in Pro-Saccade performance (see @fig-diff-parCor).
+
+```{r}
+#| echo: false
+#| label: fig-diff-parCor
+#| fig-cap: "Difference between zero-order and partial correlation with WMC when to controlling for Pro- or Anti-Saccade performance"
+
+ggplot(results_parCorr_long %>% filter(meausure == "diff"),
+       aes(y = mean, ymin = quantileLow, ymax = quantileHigh, x = variables, color = diff_Anti_Pro, group = diff_Anti_Pro)) +
+  facet_grid(. ~ n_trials, labeller = label_both) +
+  geom_pointrange(position = position_dodge(0.1)) +
+  geom_line(position = position_dodge(0.1)) +
+  labs(y = "Difference = Zero Order - Partial Correlation",
+       x = "Variables",
+       color = "Performance Difference\nPro vs. Anti")
+```
+
+In addition, the size of the reduction of the zero-order correlation when controlling for either Pro- or Anti-Saccade performance was only weakly correlated over simulation runs $r = `r round(min(results_parCorr$corr_differences),2)` - `r round(max(results_parCorr$corr_differences),2)`$. Thus, it is possible that the correlation of Anti-Saccade performance with WMC is barely reduced when controlling for Pro-Saccade performance whereas the correlation of Pro-Saccade performance with WMC is reduced by a large amount when controlling for Anti-Saccade performance and vice versa. This is also reflected in the proportion of significant correlations (EDR = empirical detection rate) and partial correlations shown in @fig-EDR-parCor. The EDR was calculated as the proportion of significant correlations and partial correlations over all simulation runs.
+
+```{r plot EDR}
+#| echo: false
+#| label: fig-EDR-parCor
+#| fig-cap: "Proportion of significant correlations and partial correlations"
+results_EDR_long <- results_parCorr %>% 
+  pivot_longer(cols = EDR_r_AntiWMC:EDR_rpar_ProWMC, names_to = "indicator", values_to = "Value") %>% 
+  mutate(statistic = str_split_i(indicator,"_",1),
+         meausure = str_split_i(indicator,"_",2),
+         variables = str_split_i(indicator,"_",3)) %>% 
+  select(-indicator) %>% 
+  pivot_wider(names_from = statistic, values_from = Value)
+
+ggplot(data = results_EDR_long,
+       aes(y = EDR, x = meausure, color = diff_Anti_Pro, group = diff_Anti_Pro)) +
+  facet_grid(variables ~ n_trials) +
+  geom_point() +
+  geom_line() +
+  labs(y = "Proportion of significant correlations",
+       x = "Type of Correlation",
+       color = "Performance Difference\nPro vs. Anti")
+```
+
+
+## Simulation: Bayesian Binomial Model
+
+We compared the traditional approach analyzing the unique relationship of Anti- vs- Pro-Saccade performance with a Bayesian Binomial model that inlcudes WMC as a predictor of performance in both tasks. By using a treatment coding for the `Task` variable coding the pro-saccade task as the reference level, the interaction of `TaskWMC` can be interpreted as the difference in the relationship of WMC with Pro- and Anti-Saccade performance. The detailed function used for the analysis is printed below:
+
+```{r}
+analyze_bayesian <- function(dat, condition, fixed_objects = NULL) {
+  Attach(condition)
+  
+  # reshape data to long format
+  dat_long <- dat %>% 
+    select(ID, nCorr_Anti, nCorr_Pro, WMC) %>% 
+    pivot_longer(cols = c("nCorr_Anti","nCorr_Pro"), values_to = "n_corr") %>% 
+    mutate(Task = str_split_i(name,"_",2),
+           n_trials = n_trials) %>%
+    select(-name)
+  
+  
+  dat_long$Task <- as.factor(dat_long$Task)
+  contrasts(dat_long$Task) <- contr.treatment(2, base = which(levels(dat_long$Task) == "Pro"))
+  
+  # set up Bayesian Binomial Model
+  binomial_formula <- brms::bf(n_corr | trials(n_trials) ~  1 + Task * WMC + (1 + Task | ID),
+                               family = binomial)
+  
+  # set priors
+  binomial_priors <- prior(logistic(0,1), class = Intercept) +
+    prior(logistic(0, 0.5), class = b)
+  
+  # fit model including an intercept, main effects of task and WMC, and their interaction
+  binomial_fit <- brms::brm(
+    formula = binomial_formula,
+    data = dat_long,
+    prior = binomial_priors,
+    sample_prior = TRUE,
+    iter = 11000,
+    warmup = 1000,
+    chains = 4,
+    cores = 1,
+    control = list(adapt_delta = 0.95),
+    backend = "cmdstanr"
+  )
+  
+  fixed_FX <- brms::fixef(binomial_fit)
+  
+  BF_parameters <- bayestestR::bayesfactor_parameters(binomial_fit)
+  
+  results <- c(postMean_b_WMC = fixed_FX["WMC","Estimate"],
+               postMean_b_WMCTask = fixed_FX["Task1:WMC","Estimate"],
+               BF10_b_WMC = BF_parameters$log_BF[3],
+               BF10_b_WMCTask = BF_parameters$log_BF[4])
+  
+  results
+}
+```
+
+To summarize the results of the Bayesian Binomial model we calculated the mean and 95% credible intervals for the posterior distributions of the regression coefficients and Bayes factors.
+
+```{r summarise results bayesian}
+#| echo: false
+summarise_bayesian <- function(condition, results, fixed_objects = NULL) {
+  mean_results <- colMeans(results)
+  quantile_results <- t(apply(results, 2, quantile, probs = c(0.025, 0.975)))
+  
+  ret <- c(mean_b_WMC = mean_results["postMean_b_WMC"],
+           mean_b_WMCTask = mean_results["postMean_b_WMCTask"],
+           mean_BF_WMC = mean_results["BF10_b_WMC"],
+           mean_BF_WMCTask = mean_results["BF10_b_WMCTask"],
+           quantileLow_b_WMC = quantile_results["postMean_b_WMC",1],
+           quantileLow_b_WMCTask = quantile_results["postMean_b_WMCTask",1],
+           quantileLow_BF_WMC = quantile_results["BF10_b_WMC",1],
+           quantileLow_BF_WMCTask = quantile_results["BF10_b_WMCTask",1],
+           quantileHigh_b_WMC = quantile_results["postMean_b_WMC",2],
+           quantileHigh_b_WMCTask = quantile_results["postMean_b_WMCTask",2],
+           quantileHigh_BF_WMC = quantile_results["BF10_b_WMC",2],
+           quantileHigh_BF_WMCTask = quantile_results["BF10_b_WMCTask",2])
+  
+  names(ret) <- c("mean_b_WMC", "mean_b_WMCTask", "mean_BF_WMC", "mean_BF_WMCTask",
+                  "quantileLow_b_WMC", "quantileLow_b_WMCTask", "quantileLow_BF_WMC", "quantileLow_BF_WMCTask",
+                  "quantileHigh_b_WMC", "quantileHigh_b_WMCTask", "quantileHigh_BF_WMC", "quantileHigh_BF_WMCTask")
+  
+  ret
+}
+```
+
+## Run Bayesian Binomial Model Simulation
+
+Due to the longer runtime of the Bayesian Binomial model, we only ran 150 simulation runs.
+
+```{r}
+#| message: false
+#| warning: false
+if(!file.exists("simulation_bayesian_results.rds")) {
+  results_bayesian <- runSimulation(design = simulation_conditions, 
+                                    replications = 150, 
+                                    generate = generate_data, 
+                                    analyse = analyze_bayesian, 
+                                    summarise = summarise_bayesian,
+                                    parallel = TRUE,
+                                    filename = "simulation_bayesian_results.rds")
+} else {
+  # load the results if they already exist
+  results_bayesian <- readRDS("simulation_bayesian_results.rds")
+}
+```
+
+```{r}
+#| echo: false
+results_bayesian_long <- results_bayesian %>% 
+  pivot_longer(cols = mean_b_WMC:quantileHigh_BF_WMCTask, names_to = "indicator", values_to = "Value") %>% 
+  mutate(statistic = str_split_i(indicator,"_",1),
+         meausure = str_split_i(indicator,"_",2),
+         variables = str_split_i(indicator,"_",3)) %>% 
+  select(-indicator) %>% 
+  pivot_wider(names_from = statistic, values_from = Value)
+
+results_bayesian_long$diff_Anti_Pro <- as.factor(results_bayesian_long$diff_Anti_Pro)
+levels(results_bayesian_long$diff_Anti_Pro) <- c(".60 vs .92", ".60 vs .95", ".60 vs .98")
+
+results_bayesian_long$w <- as.factor(results_bayesian_long$w)
+levels(results_bayesian_long$w) <- c("Pro: 100%")
+```
+
+First, we looked if the Bayesian Binomial model is able to correctly reject that the relationship of Anti- and Pro-Saccade performance with WMC differs. For this, we plotted the Bayes Factors for the main and interaction effects (see @fig-bf-binomial). The dashed lines in the plot indicate the threshold of $BF_{10} = 3$ and $BF_{01} = 3$, which can be interpreted as thresholds for moderate evidence for the alternative or null hypothesis respectively. The results indicate that there is consitently evidence for the main effect of WMC, but not for the interaction of WMC with Task. Thus, the Bayesian Binomial model detects the relationship of Pro- and Anti-Saccade performance with WMC, while also providing evidence that the relationship does not differ between the two tasks.
+
+```{r}
+#| echo: false
+#| label: fig-bf-binomial
+#| fig-cap: "Relationship between the processes dissociated in the Manual Anti-Saccade task and WMC"
+ggplot(results_bayesian_long %>% filter(meausure == "BF"),
+       aes(y = mean, ymin = quantileLow, ymax = quantileHigh, x = variables, color = diff_Anti_Pro, group = diff_Anti_Pro)) +
+  facet_grid(. ~ n_trials) +
+  geom_pointrange(position = position_dodge(0.1)) + 
+  geom_line(position = position_dodge(0.1)) +
+  geom_hline(yintercept = log(3), linetype = "dashed", color = "red") +
+  geom_hline(yintercept = log(1/3), linetype = "dashed", color = "blue") +
+  labs(y = "logBF",
+       x = "Regression Parameters",
+       color = "Performance Difference\nPro vs. Anti",
+       title = "Bayes Factors for main and interaction effects in the Bayesian Binomial Model")
+```
+
+In fact, when looking at the regression coefficients (see @fig-b-binomial), we can see that the regression coefficients for WMC are consistently positive and the interaction of WMC with Task is close to zero and if different from zero negative. If anything the model is biased towards underestimating the relationship between WMC and Anti-Saccade performance, as the negative interaction effect indicates that the relationship of WMC with Anti-Saccade performance is smaller than the relationship of WMC with Pro-Saccade performance. In contrast to the analysis of partial correlations the Bayesian Binomial model is thus able to correctly detect that Pro- and Anti-Saccade performance are related to WMC via the same binding ability and only differ in the absolute performance level. 
+
+```{r}
+#| echo: false
+#| label: fig-b-binomial
+#| fig-cap: "Relationship between the processes dissociated in the Manual Anti-Saccade task and WMC"
+ggplot(results_bayesian_long %>% filter(meausure == "b"),
+       aes(y = mean, ymin = quantileLow, ymax = quantileHigh, x = variables, color = diff_Anti_Pro, group = diff_Anti_Pro)) +
+  facet_grid(. ~ n_trials) +
+  geom_pointrange(position = position_dodge(0.1)) + 
+  geom_line(position = position_dodge(0.1)) +
+  labs(y = "Unstardardized Regression Coefficient",
+       x = "Regression Parameters",
+       color = "Performance Difference\nPro vs. Anti",
+       title = "Regression coefficients for main and interaction effects in the Bayesian Binomial Model")
+```
