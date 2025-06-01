@@ -220,7 +220,7 @@ if(!file.exists("simulation_frequentists_results.rds")) {
 }
 
 results_parCorr$diff_Anti_Pro <- as.factor(results_parCorr$diff_Anti_Pro)
-levels(results_parCorr$diff_Anti_Pro) <- c(".60 vs .92", ".60 vs .95", ".60 vs .98")
+levels(results_parCorr$diff_Anti_Pro) <- c(".60 vs .90", ".60 vs .95", ".60 vs .98")
 
 results_parCorr$w <- as.factor(results_parCorr$w)
 levels(results_parCorr$w) <- c("Pro: 100%")
@@ -412,7 +412,7 @@ results_bayesian_long <- results_bayesian %>%
   pivot_wider(names_from = statistic, values_from = Value)
 
 results_bayesian_long$diff_Anti_Pro <- as.factor(results_bayesian_long$diff_Anti_Pro)
-levels(results_bayesian_long$diff_Anti_Pro) <- c(".60 vs .92", ".60 vs .95", ".60 vs .98")
+levels(results_bayesian_long$diff_Anti_Pro) <- c(".60 vs .90", ".60 vs .95", ".60 vs .98")
 
 results_bayesian_long$w <- as.factor(results_bayesian_long$w)
 levels(results_bayesian_long$w) <- c("Pro: 100%")
