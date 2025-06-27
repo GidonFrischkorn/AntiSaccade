@@ -1,6 +1,6 @@
 # Online Supplement: Is the Anti-Saccade Task a Valid Measure of Inhibition?
 
-This R package contains the data and code for the online supplement of the paper "Is the Anti-Saccade Task a Valid Measure of Inhibition?" The paper is currently under review. You can install the R package using the following code:
+This R package contains the data and code for the online supplement of the paper "Is the Anti-Saccade Task a Valid Measure of Inhibition?" The paper is accepted for publication at the [Journal of Experimental Psychology: General](https://psycnet.apa.org/doi/10.1037/xge0001808). You can install the R package using the following code:
 
 ```r
 remotes::install_github("GidonFrischkorn/AntiSaccade")
