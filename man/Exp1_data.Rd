@@ -7,11 +7,12 @@
 \format{
 \subsection{\code{Exp1_data}}{
 
-A data frame with 35280 rows and 13 columns:
+A data frame with 138960 rows and 15 columns:
 \describe{
 \item{Exp}{Label for the Experiment in the whole experiment series}
 \item{ID}{Unique integer code for each subject who participated in the experiment}
 \item{Block}{The experimental block a trial was part of.}
+\item{block_order}{The position the experimental block was presented at.}
 \item{trial}{The trial number of the current trial}
 \item{cueLoc}{The cue location coded as a numeric value from 1 to 4.
 1 = "top", 2 = "right", 3 = "bottom", 4 = "left"}

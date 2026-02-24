@@ -7,7 +7,7 @@
 \format{
 \subsection{\code{Hood_2022_behavioral}}{
 
-A data frame with 47160 rows and 13 columns:
+A data frame with 308 rows and 10 columns:
 \describe{
 \item{sub}{The subject ID}
 \item{task}{Factor coding the task, either "pro" for the pro-saccade task, or "anti" for the anti-saccade task}

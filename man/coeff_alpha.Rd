@@ -7,15 +7,8 @@
 coeff_alpha(measurements)
 }
 \arguments{
-\item{RT}{numeric. A vector of reaction times.}
-
-\item{ACC}{numeric. A vector of accuracies to determine the proportion correct.}
-
-\item{s}{numeric. The diffusion constant. Typically set to 1 or 0.1. The default value is 1.}
-
-\item{robust}{logical. Should robust statistics, that is median and Interquartile range, be used to calculate the ezDM parameters. Default is true.}
-
-\item{use_RTs}{character. Should only correct RTs ("correct") or all RTs (any other character) be used to calculate mean and sd of RTs.}
+\item{measurements}{numeric matrix or data frame. Rows represent individuals,
+columns represent items/measurements.}
 }
 \description{
 This function calculates the Cronbach's Alpha for a set of measurments

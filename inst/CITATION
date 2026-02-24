@@ -1,0 +1,9 @@
+bibentry(
+  bibtype  = "Article",
+  title    = "Is the Anti-Saccade Task a Valid Measure of Inhibition?",
+  author   = person("Gidon T.", "Frischkorn"),
+  journal  = "Journal of Experimental Psychology: General",
+  year     = "2025",
+  doi      = "10.1037/xge0001808",
+  url      = "https://doi.org/10.1037/xge0001808"
+)

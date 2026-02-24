@@ -19,7 +19,7 @@ library(brms)
 
 ## Reproduction of Results from Unsworth et al. (2023)
 
-Hood et al. (2022) investigated if the working memory capacity is more strongly related to performance in the anti- then in the pro-saccade task. For this, they first included performance in the automated OSPAN as a predictor of performance in the anti- and pro-saccade tasks. The below analysis do not exactly reproduce the results but closely math them (see below for details).
+Unsworth et al. (2023) investigated if working memory capacity is more strongly related to performance in the anti- than in the pro-saccade task. For this, they included a composite working memory capacity score as a predictor of performance in the anti- and pro-saccade tasks. The below analyses do not exactly reproduce the results but closely match them (see below for details).
 
 ```{r Reproduction_Unsworth_Results}
 Unsworth_2023_E2_binomial %>% 

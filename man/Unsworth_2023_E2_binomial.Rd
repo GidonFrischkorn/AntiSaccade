@@ -3,7 +3,7 @@
 \docType{data}
 \name{Unsworth_2023_E2_binomial}
 \alias{Unsworth_2023_E2_binomial}
-\title{Behavioral Data from Hood et al. (2022)}
+\title{Behavioral Data from Unsworth et al. (2023)}
 \format{
 \subsection{\code{Unsworth_2023_E2_binomial}}{
 
@@ -22,6 +22,6 @@ A data frame with 338 rows and 6 columns:
 Unsworth_2023_E2_binomial
 }
 \description{
-Behavioral Data from Hood et al. (2022)
+Behavioral Data from Unsworth et al. (2023)
 }
 \keyword{datasets}

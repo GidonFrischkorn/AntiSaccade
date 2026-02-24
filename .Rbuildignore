@@ -2,3 +2,8 @@
 ^\.Rproj\.user$
 ^LICENSE\.md$
 ^local
+^docs
+^output
+^SEM
+^README\.md$
+^AntiSaccade_.*\.tar\.gz$

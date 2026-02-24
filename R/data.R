@@ -48,10 +48,10 @@
 #' }
 "SuppExp2_data"
 
-#' Raw Data of the fourth supplementary experiment in the Saccade Experiment Series
+#' Raw Data of the third supplementary experiment in the Saccade Experiment Series
 #'
 #' @format ## `SuppExp3_data`
-#' A data frame with 35280 rows and 13 columns:
+#' A data frame with 34560 rows and 14 columns:
 #' \describe{
 #'   \item{Exp}{Label for the Experiment in the whole experiment series}
 #'   \item{ID}{Unique integer code for each subject who participated in the experiment}
@@ -77,7 +77,7 @@
 #' Raw Data of the first main experiment in the Saccade Experiment series (Individual Diff. Study 1)
 #'
 #' @format ## `Exp1_data`
-#' A data frame with 35280 rows and 13 columns:
+#' A data frame with 138960 rows and 15 columns:
 #' \describe{
 #'   \item{Exp}{Label for the Experiment in the whole experiment series}
 #'   \item{ID}{Unique integer code for each subject who participated in the experiment}
@@ -101,10 +101,10 @@
 #' }
 "Exp1_data"
 
-#' Raw Data of the fifth supplementary experiment in the Saccade Experiment Series
+#' Raw Data of the fourth supplementary experiment in the Saccade Experiment Series
 #'
 #' @format ## `SuppExp4_data`
-#' A data frame with  rows and 14 columns:
+#' A data frame with 20798 rows and 14 columns:
 #' \describe{
 #'   \item{Exp}{Label for the Experiment in the whole experiment series}
 #'   \item{ID}{Unique integer code for each subject who participated in the experiment}
@@ -127,7 +127,7 @@
 #' }
 "SuppExp4_data"
 
-#' Raw Data of the sixth supplementary experiment in the Saccade Experiment Series
+#' Raw Data of the fifth supplementary experiment in the Saccade Experiment Series
 #'
 #' @format ## `SuppExp5_data`
 #' A data frame with 19440 rows and 14 columns:
@@ -153,7 +153,7 @@
 #' }
 "SuppExp5_data"
 
-#' Raw Data of the seventh supplementary experiment in the Saccade Experiment Series
+#' Raw Data of the sixth supplementary experiment in the Saccade Experiment Series
 #'
 #' @format ## `SuppExp6_data`
 #' A data frame with 21602 rows and 15 columns:
@@ -183,7 +183,7 @@
 #' Raw Data of the second main experiment in the Saccade Experiment series (Individual Diff. Study 2)
 #'
 #' @format ## `Exp2_data`
-#' A data frame with 126000 rows and 14 columns:
+#' A data frame with 126000 rows and 15 columns:
 #' \describe{
 #'   \item{Exp}{Label for the Experiment in the whole experiment series}
 #'   \item{task}{The task within Experiment 9 from which the data stem from}
@@ -225,13 +225,14 @@
 #' }
 "Exp2_PS_data"
 
-#' Raw Data of processing speed covariated from Experiment 9 (Individual Diff. Study 2)
+#' Raw Data of working memory capacity covariates from Experiment 2 (Individual Diff. Study 2)
 #'
 #' @format ## `Exp2_WMC_data`
-#' A data frame with 47160 rows and 13 columns:
+#' A data frame with 47160 rows and 12 columns:
 #' \describe{
 #'   \item{task}{The task within Experiment 9 from which the data stem from}
 #'   \item{ID}{Unique integer code for each subject who participated in the experiment}
+#'   \item{block}{The experimental block a trial was part of.}
 #'   \item{trialNum}{The trial number of the current trial}
 #'   \item{setsize}{The number of items to be maintained in memory for retrieval.}
 #'   \item{whatRet}{Character variable coding what information should be retrieved (or processes for the processing task
@@ -248,7 +249,7 @@
 #' Behavioral Data from Hood et al. (2022)
 #'
 #' @format ## `Hood_2022_behavioral`
-#' A data frame with 47160 rows and 13 columns:
+#' A data frame with 308 rows and 10 columns:
 #' \describe{
 #'   \item{sub}{The subject ID}
 #'   \item{task}{Factor coding the task, either "pro" for the pro-saccade task, or "anti" for the anti-saccade task}
@@ -263,7 +264,7 @@
 #' }
 "Hood_2022_behavioral"
 
-#' Behavioral Data from Hood et al. (2022)
+#' Behavioral Data from Unsworth et al. (2023)
 #'
 #' @format ## `Unsworth_2023_E2_binomial`
 #' A data frame with 338 rows and 6 columns:

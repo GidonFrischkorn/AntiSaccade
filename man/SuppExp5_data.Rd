@@ -3,7 +3,7 @@
 \docType{data}
 \name{SuppExp5_data}
 \alias{SuppExp5_data}
-\title{Raw Data of the sixth supplementary experiment in the Saccade Experiment Series}
+\title{Raw Data of the fifth supplementary experiment in the Saccade Experiment Series}
 \format{
 \subsection{\code{SuppExp5_data}}{
 
@@ -34,6 +34,6 @@ A data frame with 19440 rows and 14 columns:
 SuppExp5_data
 }
 \description{
-Raw Data of the sixth supplementary experiment in the Saccade Experiment Series
+Raw Data of the fifth supplementary experiment in the Saccade Experiment Series
 }
 \keyword{datasets}

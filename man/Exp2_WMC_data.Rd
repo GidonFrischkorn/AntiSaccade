@@ -3,14 +3,15 @@
 \docType{data}
 \name{Exp2_WMC_data}
 \alias{Exp2_WMC_data}
-\title{Raw Data of processing speed covariated from Experiment 9 (Individual Diff. Study 2)}
+\title{Raw Data of working memory capacity covariates from Experiment 2 (Individual Diff. Study 2)}
 \format{
 \subsection{\code{Exp2_WMC_data}}{
 
-A data frame with 47160 rows and 13 columns:
+A data frame with 47160 rows and 12 columns:
 \describe{
 \item{task}{The task within Experiment 9 from which the data stem from}
 \item{ID}{Unique integer code for each subject who participated in the experiment}
+\item{block}{The experimental block a trial was part of.}
 \item{trialNum}{The trial number of the current trial}
 \item{setsize}{The number of items to be maintained in memory for retrieval.}
 \item{whatRet}{Character variable coding what information should be retrieved (or processes for the processing task
@@ -28,6 +29,6 @@ of the complex span task)}
 Exp2_WMC_data
 }
 \description{
-Raw Data of processing speed covariated from Experiment 9 (Individual Diff. Study 2)
+Raw Data of working memory capacity covariates from Experiment 2 (Individual Diff. Study 2)
 }
 \keyword{datasets}

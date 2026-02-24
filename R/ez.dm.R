@@ -12,6 +12,8 @@
 #' @param robust logical. Should robust statistics, that is median and Interquartile range, be used to calculate the ezDM parameters. Default is true.
 #' @param use_RTs character. Should only correct RTs ("correct") or all RTs (any other character) be used to calculate mean and sd of RTs.
 #'
+#' @importFrom stats median IQR qnorm qlogis var
+#'
 #' @export
 ez.dm <- function(RT, ACC, s = 1, robust = TRUE, use_RTs = "correct"){
   # The default value for the scaling parameter s equals 0.1

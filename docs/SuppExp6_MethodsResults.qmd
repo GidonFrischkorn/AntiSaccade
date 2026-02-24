@@ -138,7 +138,7 @@ ggplot(data = plot_data,
 ```
 
 ```{r FitModel, echo=FALSE}
-fit_SuppExp7_saturated <- brms::brm(linear_model,
+fit_SuppExp6_saturated <- brms::brm(linear_model,
                           data = agg_data,
                           family = model_family,
                           backend = "cmdstanr",
@@ -155,14 +155,14 @@ fit_SuppExp7_saturated <- brms::brm(linear_model,
 #| label: fig-PredEffects
 #| fig-cap: "Posterior predictives of the average proportion correct as a function of CTI duration in the three experimental blocks."
 newdata <- expand.grid(
-  ID = unique(fit_SuppExp7_saturated$data$ID),
+  ID = unique(fit_SuppExp6_saturated$data$ID),
   nTrials = 1,
-  device = unique(fit_SuppExp7_saturated$data$device),
-  Block = unique(fit_SuppExp7_saturated$data$Block),
-  CTI_num = unique(fit_SuppExp7_saturated$data$CTI_num)
+  device = unique(fit_SuppExp6_saturated$data$device),
+  Block = unique(fit_SuppExp6_saturated$data$Block),
+  CTI_num = unique(fit_SuppExp6_saturated$data$CTI_num)
 )
 
-tidy_pred_saturated <- fit_SuppExp7_saturated %>% 
+tidy_pred_saturated <- fit_SuppExp6_saturated %>% 
   tidybayes::epred_draws(newdata = newdata, ndraws = 1000) %>% 
   group_by(ID, device, CTI_num, Block) %>% 
   summarise(predValue = mean(.epred)) %>% 
@@ -195,6 +195,6 @@ hyp_fit <- c(Ant_intFX = "deviceLaptop:BlockAnti = devicePC:BlockAnti",
              Cen_ctiFX = "deviceLaptop:BlockCentral:CTI_num = devicePC:BlockCentral:CTI_num",
              Col_ctiFX = "deviceLaptop:BlockColour:CTI_num = devicePC:BlockColour:CTI_num")
 
-hyp_results <- hypothesis(fit_SuppExp7_saturated,hyp_fit)
+hyp_results <- hypothesis(fit_SuppExp6_saturated,hyp_fit)
 knitr::kable(hyp_results$hypothesis, digits = 2)
 ```

@@ -7,7 +7,7 @@
 \format{
 \subsection{\code{Exp2_data}}{
 
-A data frame with 126000 rows and 14 columns:
+A data frame with 126000 rows and 15 columns:
 \describe{
 \item{Exp}{Label for the Experiment in the whole experiment series}
 \item{task}{The task within Experiment 9 from which the data stem from}
